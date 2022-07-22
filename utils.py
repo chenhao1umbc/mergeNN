@@ -41,4 +41,3 @@ def plot_gate_values(gate_values, student_num):
         plt.title('layer number {}'.format(layer_num))
         plt.savefig('students/gates{}_{}.png'.format(student_num, layer_num))
 
-

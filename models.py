@@ -23,6 +23,7 @@ class Conv3x3(nn.Module):
         x = self.layer(x)
         return x
 
+
 class Conv1x1(nn.Module):
     def __init__(self, in_planes: int, out_planes: int, stride: int = 1):
         super().__init__()
@@ -144,3 +145,76 @@ class Teacher(nn.Module):
         x = self.fc(x)
 
         return x
+
+
+class Student(nn.Module):
+    def __init__(self, teacher0, teacher1):
+        super(Student, self).__init__()
+        self.conv1 = connect_first_conv2d(teacher0.conv1, teacher1.conv1)
+        self.bn1 = connect_bn(16 * 2, teacher0.bn1, teacher1.bn1)
+        self.relu = nn.ReLU()
+
+        self.layer1 = L0Layer(teacher0.layer1, teacher1.layer1)
+        self.gate = self.layer1.main_gate
+        self.layer2 = L0Layer(teacher0.layer2, teacher1.layer2)
+        self.layer3 = L0Layer(teacher0.layer3, teacher1.layer3)
+
+        self.layers = [self.layer1, self.layer2, self.layer3]
+
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = connect_final_linear(teacher0.fc, teacher1.fc)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        mask = self.gate.mask(x)
+        x = self.gate(x, mask)
+
+        x = self.layers[0](x, mask)
+        for layer in self.layers[1:]:
+            x = layer(x)
+
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+
+        x = self.fc(x)
+
+        return x
+
+    def l0_loss(self):
+        l0_loss = 0#self.gate.l0_loss()
+        for layer in self.layers:
+            l0_loss += layer.l0_loss()
+        return l0_loss
+
+    def compress(self):
+        importance_indices = self.gate.important_indices()
+        self.conv1 = compress_conv2d(self.conv1, torch.ones(3, dtype=torch.bool), importance_indices)
+        self.bn1 = compress_bn(self.bn1, 16, importance_indices)
+        for layer in self.layers:
+            importance_indices = layer.compress(importance_indices)
+        self.fc = compress_final_linear(self.fc, importance_indices)
+
+        delattr(self, 'gate')
+        self.forward = types.MethodType(new_forward, self)
+
+    def gate_parameters(self):
+        parameters = []# [self.gate.parameters()]
+        for layer in self.layers:
+            parameters.append(layer.gate_parameters())
+        return chain.from_iterable(parameters)
+
+    def non_gate_parameters(self):
+        parameters = [self.conv1.parameters(), self.bn1.parameters(), self.fc.parameters()]
+        for layer in self.layers:
+            parameters.append(layer.non_gate_parameters())
+        return chain.from_iterable(parameters)
+
+    def gate_values(self):
+        values = []#[self.gate.importance_of_features()]
+        for layer in self.layers:
+            values += layer.gate_values()
+
+        return values
+
