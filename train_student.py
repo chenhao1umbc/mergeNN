@@ -189,7 +189,7 @@ def train_student_second_stage(student):
     return history
 
 
-
+i = 0
 history, gate_values = train_student_first_stage(student)
 plot_history(history, [0, 1, 2], ['train', 'l0', 'test'], 'students/before_compress_losses{}.png'.format(i))
 plot_history(history, [3, 4], ['train acc', 'test acc'], 'students/before_compress_acc{}.png'.format(i))

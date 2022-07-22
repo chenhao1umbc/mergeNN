@@ -1,11 +1,12 @@
-from turtle import forward
 import torch
 from torch import nn
 import torch.nn.functional as Func
 import torch.utils.data as Data
 import torch_optimizer as optim
 
-# from torch.utils.tensorboard import SummaryWriter
+from utils import *
+import math
+
 "make the result reproducible"
 torch.manual_seed(1)
 torch.backends.cudnn.deterministic = True
@@ -65,7 +66,7 @@ class Layer(nn.Module):
         self.conv6 = Conv3x3(planes, planes)
         self.bn6 = nn.BatchNorm2d(planes)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
         identity = x
         if self.downsample_conv is not None:
             identity = self.downsample_conv(identity)
@@ -107,6 +108,206 @@ class Layer(nn.Module):
         return out
 
 
+class L0GateLayer2d(nn.Module):
+    def __init__(self, n_channels, loc_mean=1, loc_sd=0.01, beta=2 / 3, gamma=-0.1, zeta=1.1, fix_temp=True):
+        super(L0GateLayer2d, self).__init__()
+        self.n_channels = n_channels
+        self.loc = nn.Parameter(torch.zeros(n_channels).normal_(loc_mean, loc_sd))
+        self.temp = beta if fix_temp else nn.Parameter(torch.zeros(1).fill_(beta))
+        self.register_buffer("uniform", torch.zeros((1, n_channels)))
+        self.gamma = gamma
+        self.zeta = zeta
+        self.gamma_zeta_ratio = math.log(-gamma / zeta)
+
+    def forward(self, x, mask=None):
+        if mask is None:
+            mask = self.mask(x)
+        x = x.permute(2, 3, 0, 1)
+        x = x * mask
+        x = x.permute(2, 3, 0, 1)
+        return x
+
+    def mask(self, x):
+        batch_size = x.shape[0]
+        if batch_size > self.uniform.shape[0]:
+            self.uniform = torch.zeros((batch_size, self.n_channels), device=self.uniform.device)
+        self.uniform.uniform_()
+        u = self.uniform[:batch_size]
+        s = torch.sigmoid((torch.log(u) - torch.log(1 - u) + self.loc) / self.temp)
+        s = s * (self.zeta - self.gamma) + self.gamma
+        return hard_sigmoid(s)
+
+    def l0_loss(self):
+        mean_probability_of_nonzero_gate = torch.mean(torch.sigmoid(self.loc - self.gamma_zeta_ratio * self.temp))
+        loss = torch.square(mean_probability_of_nonzero_gate - 0.5)
+        return loss
+
+    def importance_of_features(self):
+        s = torch.sigmoid(self.loc * (self.zeta - self.gamma) + self.gamma)
+        return hard_sigmoid(s)
+
+    def important_indices(self):
+        importance = self.importance_of_features().detach()
+        important_indices = torch.argsort(importance, descending=True)[:len(importance) // 2]
+        return important_indices
+
+
+class L0Layer(nn.Module):
+    def __init__(self, layer1, layer2):
+        super(L0Layer, self).__init__()
+        self.relu = nn.ReLU()
+
+        planes = layer1.conv1.out_channels * 2
+        self.main_gate = L0GateLayer2d(planes)
+
+        # downsample
+        if layer1.downsample_conv is not None:
+            self.downsample_conv = connect_middle_conv(layer1.downsample_conv, layer2.downsample_conv)
+            self.downsample_bn = nn.BatchNorm2d(planes)
+        else:
+            self.downsample_conv = None
+
+        # first block
+        self.conv1 = connect_middle_conv(layer1.conv1, layer2.conv1)
+        self.gate1 = L0GateLayer2d(planes)
+        self.bn1 = connect_bn(planes, layer1.bn1, layer2.bn1)
+        self.conv2 = connect_middle_conv(layer1.conv2, layer2.conv2)
+        self.bn2 = connect_bn(planes, layer1.bn2, layer2.bn2)
+
+        # second block
+        self.conv3 = connect_middle_conv(layer1.conv3, layer2.conv3)
+        self.gate2 = L0GateLayer2d(planes)
+        self.bn3 = connect_bn(planes, layer1.bn3, layer2.bn3)
+        self.conv4 = connect_middle_conv(layer1.conv4, layer2.conv4)
+        self.bn4 = connect_bn(planes, layer1.bn4, layer2.bn4)
+
+        # second block
+        self.conv5 = connect_middle_conv(layer1.conv5, layer2.conv5)
+        self.gate3 = L0GateLayer2d(planes)
+        self.bn5 = connect_bn(planes, layer1.bn5, layer2.bn5)
+        self.conv6 = connect_middle_conv(layer1.conv6, layer2.conv6)
+        self.bn6 = connect_bn(planes, layer1.bn6, layer2.bn6)
+
+    def forward(self, x, main_mask=None):
+        if main_mask is None:
+            main_mask = self.main_gate.mask(x)
+
+        # downsample
+        identity = x
+        if self.downsample_conv is not None:
+            identity = self.downsample_conv(identity)
+            identity = self.downsample_bn(identity)
+
+        # first block
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.gate1(x)
+
+        x = self.conv2(x)
+        x = self.bn2(x)
+
+        x += identity
+        x = self.relu(x)
+        x = self.main_gate(x, main_mask)
+
+        # second block
+        identity = x
+        x = self.conv3(x)
+        x = self.bn3(x)
+        x = self.relu(x)
+        x = self.gate2(x)
+
+        x = self.conv4(x)
+        x = self.bn4(x)
+
+        x += identity
+        x = self.relu(x)
+        x = self.main_gate(x, main_mask)
+
+        # second block
+        identity = x
+        x = self.conv5(x)
+        x = self.bn5(x)
+        x = self.relu(x)
+        x = self.gate3(x)
+
+        x = self.conv6(x)
+        x = self.bn6(x)
+
+        x += identity
+        x = self.relu(x)
+        x = self.main_gate(x, main_mask)
+
+        return x
+
+    def l0_loss(self):
+        return self.main_gate.l0_loss() + self.gate1.l0_loss() + self.gate2.l0_loss() + self.gate3.l0_loss()
+
+    def compress(self, in_importance_indices):
+        out_importance_indices = self.main_gate.important_indices().detach()
+        planes = len(out_importance_indices)
+
+        # downsample
+        if self.downsample_conv is not None:
+            self.downsample_conv = compress_conv2d(self.downsample_conv, in_importance_indices, out_importance_indices)
+            self.downsample_bn = nn.BatchNorm2d(planes)
+
+        # first block
+        important_indices_in_block = self.gate1.important_indices()
+        self.conv1 = compress_conv2d(self.conv1, in_importance_indices, important_indices_in_block)
+        self.bn1 = compress_bn(self.bn1, planes, important_indices_in_block)
+        self.conv2 = compress_conv2d(self.conv2, important_indices_in_block, out_importance_indices)
+        self.bn2 = compress_bn(self.bn2, planes, out_importance_indices)
+
+        # second block
+        important_indices_in_block = self.gate2.important_indices()
+        self.conv3 = compress_conv2d(self.conv3, out_importance_indices, important_indices_in_block)
+        self.bn3 = compress_bn(self.bn3, planes, important_indices_in_block)
+        self.conv4 = compress_conv2d(self.conv4, important_indices_in_block, out_importance_indices)
+        self.bn4 = compress_bn(self.bn4, planes, out_importance_indices)
+
+        important_indices_in_block = self.gate3.important_indices()
+        self.conv5 = compress_conv2d(self.conv5, out_importance_indices, important_indices_in_block)
+        self.bn5 = compress_bn(self.bn5, planes, important_indices_in_block)
+        self.conv6 = compress_conv2d(self.conv6, important_indices_in_block, out_importance_indices)
+        self.bn6 = compress_bn(self.bn6, planes, out_importance_indices)
+
+        delattr(self, 'main_gate')
+        delattr(self, 'gate1')
+        delattr(self, 'gate2')
+        delattr(self, 'gate3')
+        self.forward = types.MethodType(new_forward, self)
+        return out_importance_indices
+
+    def gate_parameters(self):
+        return chain(self.main_gate.parameters(), self.gate1.parameters(), self.gate2.parameters(), self.gate3.parameters())
+
+    def non_gate_parameters(self):
+        parameters = [self.conv1.parameters(),
+                      self.bn1.parameters(),
+                      self.conv2.parameters(),
+                      self.bn2.parameters(),
+                      self.conv3.parameters(),
+                      self.bn3.parameters(),
+                      self.conv4.parameters(),
+                      self.bn4.parameters(),
+                      self.conv5.parameters(),
+                      self.bn5.parameters(),
+                      self.conv6.parameters(),
+                      self.bn6.parameters()]
+        if self.downsample_conv is not None:
+            parameters += [self.downsample_conv.parameters(),
+                           self.downsample_bn.parameters()]
+
+        return chain.from_iterable(parameters)
+
+    def gate_values(self):
+        """used only for plots"""
+        return [self.main_gate.importance_of_features(), self.gate1.importance_of_features(),
+                self.gate2.importance_of_features(), self.gate3.importance_of_features()]
+
+
 class Teacher(nn.Module):
     def __init__(self) -> None:
         super(Teacher, self).__init__()
@@ -131,7 +332,7 @@ class Teacher(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
