@@ -4,16 +4,13 @@ from torch.optim.lr_scheduler import MultiStepLR
 import torch.nn.functional as F
 import math
 
-from models import Teacher
-from models import Student
+from modules import Teacher
+from modules import Student
 from utils import *
 from tqdm import tqdm
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets 
 import sys
-
-
-
 
 # student = initialize_student(i)
 teacher1 = Teacher()

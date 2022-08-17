@@ -3,7 +3,7 @@ from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
 import torch.nn.functional as F
 
-from models import Teacher
+from modules import Teacher
 from utils import plot_history
 
 from tqdm import tqdm
@@ -12,7 +12,7 @@ import torchvision.datasets as datasets
 import sys
 
 
-teacher_num = 2
+teacher_num = 0
 
 torch.manual_seed(teacher_num)
 device = torch.device('cuda:3')
@@ -42,7 +42,7 @@ optimizer = SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
 scheduler = MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
 
 history = []
-for epoch in tqdm(range(200)):
+for epoch in tqdm(range(5)):
     model.train()
     running_training_loss = 0
     correct_answers_train = 0
