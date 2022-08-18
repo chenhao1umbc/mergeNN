@@ -1,13 +1,13 @@
 #%% load dependency
 import os
 import numpy as np
-import torch
 from tqdm import tqdm
-import torch.nn as nn
+from utils import *
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from skimage.io import imread
-import torch.nn.functional as Func
+from datetime import datetime
+print('starting date time ', datetime.now())
 
 #%% prepare data
 class DBCDataset(Dataset):
@@ -65,7 +65,7 @@ class DBCDataset(Dataset):
     def __len__(self):
         # required method for getting size of dataset
         return len(self.labels)
-data_dir = './data' #data directory
+data_dir = './data/DBC' #data directory
 img_size = 128  # image size
 dataset = DBCDataset(data_dir, img_size)
 #split data
@@ -82,9 +82,9 @@ train_dataset, validation_dataset, test_dataset = \
     torch.utils.data.random_split(dataset, [num_train, num_validation, num_test])
 train_batchsize = 64
 eval_batchsize = 32
-train_loader = DataLoader(train_dataset, batch_size=train_batchsize, shuffle=True)                                      
-validation_loader = DataLoader(validation_dataset, batch_size=eval_batchsize)
-test_loader = DataLoader(test_dataset, batch_size=eval_batchsize)
+train_loader = DataLoader(train_dataset, train_batchsize, shuffle=True)                                      
+validation_loader = DataLoader(validation_dataset, eval_batchsize)
+test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%% load model
 model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
@@ -98,7 +98,7 @@ best_validation_accuracy = 0. # used to pick the best-performing model on the va
 train_accs = []
 val_accs = []
 
-opt = {'epochs':100}
+opt = {'epochs':3}
 optimizer = torch.optim.RAdam(model.parameters(),
                 lr= 0.001,
                 betas=(0.9, 0.999), 
@@ -132,8 +132,6 @@ for epoch in range(opt['epochs']):
 	print("Training accuracy: {}".format(train_acc))
 	train_accs.append(train_acc)
 
-
-
 	# predict on validation set (similar to training set):
 	total_val_examples = 0
 	num_correct_val = 0
@@ -162,3 +160,20 @@ for epoch in range(opt['epochs']):
 		best_validation_accuracy = val_acc
 		print("Validation accuracy improved; saving model.")
 		torch.save(model.state_dict(), f'teachers/teacher{id}.pt')
+
+
+#%% plot train and val results
+epochs_list = list(range(opt['epochs']))
+plt.figure()
+plt.plot(epochs_list, train_accs, 'b-', label='training set accuracy')
+plt.plot(epochs_list, val_accs, 'r-', label='validation set accuracy')
+plt.xlabel('epoch')
+plt.ylabel('prediction accuracy')
+plt.ylim(0.5, 1)
+plt.title('Classifier training evolution:\nprediction accuracy over time')
+plt.legend()
+plt.savefig(f'train_val{id}.png')
+plt.show()
+
+print('done')
+print('End date time ', datetime.now())

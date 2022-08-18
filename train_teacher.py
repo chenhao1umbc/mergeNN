@@ -87,6 +87,6 @@ for epoch in tqdm(range(5)):
                     correct_answers_train / total_train,
                     correct_answers_test / total_test))
 
-torch.save(model.state_dict(), 'teachers/teacher{}.pt'.format(teacher_num))
+torch.save(model.state_dict(), 'teacher/teacher{}.pt'.format(teacher_num))
 plot_history(history, [0, 1], ['train loss', 'test loss'], 'teachers/teacher{}_losses.png'.format(teacher_num))
 plot_history(history, [2, 3], ['train acc', 'test acc'], 'teachers/teacher{}_acc.png'.format(teacher_num))
