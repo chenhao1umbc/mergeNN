@@ -87,13 +87,13 @@ validation_loader = DataLoader(validation_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%% load model
-model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
 # make first layer channel==1
 model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
 model = model.cuda()
 
 #%% train_net
-id = 0 # for diff. runs
+id = 1 # for diff. runs
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
@@ -139,7 +139,7 @@ for epoch in range(opt['epochs']):
     model.eval()
     with torch.no_grad(): # don't save parameter gradients/changes since this is not for model training
         # for batch_index, (inputs, gt_label) in tqdm(enumerate(validation_loader), total=len(validation_dataset)//eval_batchsize):
-        for batch_index, (inputs, gt_label) in enumerate(validation_loader):
+        for batch_index, (inputs, gt_label) in enumerate(validation_loader):    
             inputs = inputs.cuda()
             gt_label = gt_label.cuda()
             predictions = model(inputs)
