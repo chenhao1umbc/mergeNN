@@ -87,9 +87,10 @@ validation_loader = DataLoader(validation_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%% load model
-model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
-# make first layer channel==1
-model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+# # model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+# model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=True)
+model.conv1 = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
 model = model.cuda()
 
 #%% train_net
