@@ -19,12 +19,11 @@ neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
 pos_all = torch.load('./data/pos_all.pt')
 
 train_dataset = Data.TensorDataset(torch.cat((pos_all[:num_train], neg_all[:num_train]), dim=0), \
-                torch.cat((torch.ones(num_train), torch.zeros(num_train)), dim=0))
+                torch.cat((torch.ones(num_train, dtype=int), torch.zeros(num_train,  dtype=int)), dim=0))
 val_dataset = Data.TensorDataset(torch.cat((pos_all[num_train:split1],neg_all[num_train:split1]), dim=0), \
-                torch.cat((torch.ones(num_val), torch.zeros(num_val)), dim=0))
+                torch.cat((torch.ones(num_val, dtype=int), torch.zeros(num_val, dtype=int)), dim=0))
 test_dataset = Data.TensorDataset(torch.cat((pos_all[split1:split2], neg_all[split1:split2]), dim=0), \
-                torch.cat((torch.ones(num_test), torch.zeros(num_test)), dim=0))
-
+                torch.cat((torch.ones(num_test, dtype=int), torch.zeros(num_test, dtype=int)), dim=0))
 train_batchsize = 64
 eval_batchsize = 32
 train_loader = DataLoader(train_dataset, train_batchsize, shuffle=True)                                      
@@ -32,14 +31,14 @@ validation_loader = DataLoader(val_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%% load model
-# # model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
-# model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=True)
-model.conv1 = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+# model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=True)
+# model.conv1 = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
 model = model.cuda()
 
 #%% train_net
-id = 2 # for diff. runs
+id = 10 # for diff. runs
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
