@@ -87,19 +87,19 @@ validation_loader = DataLoader(validation_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%% load model
-# # model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+# # model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
 # model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=True)
+model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=False)
 model.conv1 = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
 model = model.cuda()
 
 #%% train_net
-id = 1 # for diff. runs
+id = 3 # for diff. runs
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
 
-opt = {'epochs':200}
+opt = {'epochs':100}
 optimizer = torch.optim.RAdam(model.parameters(),
                 lr= 0.001,
                 betas=(0.9, 0.999), 

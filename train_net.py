@@ -94,12 +94,12 @@ model.conv1 = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1)
 model = model.cuda()
 
 #%% train_net
-id = 0 # for diff. runs
+id = 2 # for diff. runs
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
 
-opt = {'epochs':200}
+opt = {'epochs':100}
 optimizer = torch.optim.RAdam(model.parameters(),
                 lr= 0.001,
                 betas=(0.9, 0.999), 
