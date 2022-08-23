@@ -352,7 +352,7 @@ class Student(nn.Module):
     def __init__(self, teacher0, teacher1):
         super(Student, self).__init__()
         self.conv1 = connect_first_conv2d(teacher0.conv1, teacher1.conv1)
-        self.bn1 = connect_bn(16 * 2, teacher0.bn1, teacher1.bn1)
+        self.bn1 = connect_bn(64 * 2, teacher0.bn1, teacher1.bn1)
         self.relu = nn.ReLU()
 
         self.layer1 = L0Layer(teacher0.layer1, teacher1.layer1)

@@ -74,19 +74,12 @@ def hard_sigmoid(x):
     return torch.min(torch.max(x, torch.zeros_like(x)), torch.ones_like(x))
 
 
-def connect_first_conv2d(conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
-    """first conv is the conv at the beginning of resnet (before layers) that takes 3 channels"""
-    conv = nn.Conv2d(3, 16 * 2, kernel_size=(3,3), stride=(1, 1), padding=1, bias=False)
-    conv.weight.data[:16] = conv1.weight.data.detach().clone()
-    conv.weight.data[16:] = conv2.weight.data.detach().clone()
-    return conv
-
 
 def connect_middle_conv(conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
     """middle conv is conv in layers/blocks"""
     in_channels = conv1.in_channels
     out_channels = conv1.out_channels
-    conv = nn.Conv2d(in_channels * 2, out_channels * 2, kernel_size=conv1.kernel_size, stride=conv1.stride,
+    conv = nn.Conv2d(in_channels*2, out_channels*2, kernel_size=conv1.kernel_size, stride=conv1.stride,
                      padding=conv1.padding, bias=False)
     conv.weight.data *= 0
     conv.weight.data[:out_channels, :in_channels] = conv1.weight.data.detach().clone()
@@ -94,10 +87,3 @@ def connect_middle_conv(conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
     return conv
 
 
-def connect_bn(planes, bn1, bn2):
-    out = nn.BatchNorm2d(planes)
-    out.weight.data[:planes//2] = bn1.weight.data.clone()
-    out.weight.data[planes//2:] = bn2.weight.data.clone()
-    out.bias.data[:planes//2] = bn1.bias.data.clone()
-    out.bias.data[planes//2:] = bn2.bias.data.clone()
-    return out

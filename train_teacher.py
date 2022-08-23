@@ -1,3 +1,4 @@
+#%% 
 import torch
 from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
@@ -11,7 +12,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets 
 import sys
 
-
+#%%
 teacher_num = 0
 
 torch.manual_seed(teacher_num)
