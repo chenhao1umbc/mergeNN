@@ -74,6 +74,26 @@ def hard_sigmoid(x):
     return torch.min(torch.max(x, torch.zeros_like(x)), torch.ones_like(x))
 
 
+def connect_first_conv2d(conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
+    """first conv is the conv at the beginning of resnet (before layers) that takes 3 channels"""
+    ker_size = conv1.kernel_size
+    n_stride = conv1.stride
+    out_channels = conv1.out_channels
+    n_padding = conv1.padding
+    conv = nn.Conv2d(1, out_channels*2, ker_size, n_stride, n_padding, bias=False)
+    conv.weight.data[:out_channels] = conv1.weight.data.detach().clone()
+    conv.weight.data[out_channels:] = conv2.weight.data.detach().clone()
+    return conv
+
+
+def connect_bn(planes, bn1, bn2):
+    out = nn.BatchNorm2d(planes)
+    out.weight.data[:planes//2] = bn1.weight.data.clone()
+    out.weight.data[planes//2:] = bn2.weight.data.clone()
+    out.bias.data[:planes//2] = bn1.bias.data.clone()
+    out.bias.data[planes//2:] = bn2.bias.data.clone()
+    return out
+
 
 def connect_middle_conv(conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
     """middle conv is conv in layers/blocks"""
@@ -86,4 +106,46 @@ def connect_middle_conv(conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
     conv.weight.data[out_channels:, in_channels:] = conv2.weight.data.detach().clone()
     return conv
 
+
+def new_forward(self, x):
+    identity = x
+
+    # first block
+    out = self.conv1(x)
+    out = self.bn1(out)
+    out = self.relu(out)
+
+    out = self.conv2(out)
+    out = self.bn2(out)
+
+    if self.downsample_conv is not None:
+        identity = self.downsample_conv(identity)
+        identity = self.downsample_bn(identity)
+
+    out += identity
+    out = self.relu(out)
+
+    # second block
+    identity = out
+    out = self.conv3(out)
+    out = self.bn3(out)
+    out = self.relu(out)
+
+    out = self.conv4(out)
+    out = self.bn4(out)
+
+    out += identity
+    out = self.relu(out)
+
+    identity = out
+    out = self.conv5(out)
+    out = self.bn5(out)
+    out = self.relu(out)
+
+    out = self.conv6(out)
+    out = self.bn6(out)
+
+    out += identity
+    out = self.relu(out)
+    return out
 
