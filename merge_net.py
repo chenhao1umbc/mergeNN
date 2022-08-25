@@ -1,15 +1,9 @@
 #%%
 import torch
-from torch.optim import SGD
-from torch.optim.lr_scheduler import MultiStepLR
-import torch.nn.functional as F
 from modules import *
-
 from utils import *
-from tqdm import tqdm
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets 
-import sys
+from torch.utils.data import Dataset, DataLoader
+
 
 #%%
 teacher0 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
@@ -21,18 +15,6 @@ teacher1.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3,
 teacher1.load_state_dict(torch.load(f'teachers/teacher{10}.pt'))
 
 #%%
-class Connect_1st_conv(nn.Module):
-    def __init__(self, conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
-        super().__init__()
-        """first conv is the conv at the beginning of resnet (before layers) that takes 3 channels"""
-        ker_size = conv1.kernel_size
-        n_stride = conv1.stride
-        out_channels = conv1.out_channels
-        n_padding = conv1.padding
-        self.conv = nn.Conv2d(1, out_channels*2, ker_size, n_stride, n_padding, bias=False)
-        self.conv.weight.data[:out_channels] = conv1.weight.data.detach().clone()
-        self.conv.weight.data[out_channels:] = conv2.weight.data.detach().clone()
-
 class Connect_conv(nn.Module):
     def __init__(self, conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
         super().__init__()
@@ -44,51 +26,53 @@ class Connect_conv(nn.Module):
         self.conv.weight.data *= 0
         self.conv.weight.data[:out_channels, :in_channels] = conv1.weight.data.detach().clone()
         self.conv.weight.data[out_channels:, in_channels:] = conv2.weight.data.detach().clone()
+    def forward(self, x):
+        return self.conv
 
 class Connect_bn(nn.Module):
     def __init__(self, n_channel, bn1, bn2):
         super().__init__()
-        self.bn = nn.BatchNorm2d(n_channel)
-        self.bn.weight.data[:n_channel//2] = bn1.weight.data.clone()
-        self.bn.weight.data[n_channel//2:] = bn2.weight.data.clone()
-        self.bn.bias.data[:n_channel//2] = bn1.bias.data.clone()
-        self.bn.bias.data[n_channel//2:] = bn2.bias.data.clone()
+        self.out = nn.BatchNorm2d(n_channel)
+        self.out.weight.data[:n_channel//2] = bn1.weight.data.clone()
+        self.out.weight.data[n_channel//2:] = bn2.weight.data.clone()
+        self.out.bias.data[:n_channel//2] = bn1.bias.data.clone()
+        self.out.bias.data[n_channel//2:] = bn2.bias.data.clone()
+    def forward(self, x):    
+        return self.out
 
 class Layer_l0(nn.Module):
     def __init__(self, tch0_layer, tch1_layer):
-        "teach_layer contains two basic blocks"
         super().__init__()
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
 
-        n_channel = tch0_layer[0].conv1.out_channels * 2
+        n_channel = tch0_layer.conv1.out_channels * 2
         self.main_gate = L0GateLayer2d(n_channel)
 
         # downsample
-        if tch0_layer[0].downsample is not None:
-            self.downsample_conv = Connect_conv(
-                tch0_layer[0].downsample[0], tch1_layer[0].downsample[0]).conv
+        if tch0_layer.downsample_conv is not None:
+            self.downsample_conv = connect_middle_conv(tch0_layer.downsample_conv, tch1_layer.downsample_conv)
             self.downsample_bn = nn.BatchNorm2d(n_channel)
         else:
             self.downsample_conv = None
 
         # first block
         self.block0 = nn.Sequential(
-            Connect_conv(tch0_layer[0].conv1, tch1_layer[0].conv1).conv, #self.conv1
-            Connect_bn(n_channel, tch0_layer[0].bn1, tch1_layer[0].bn1).bn, #self.bn1
+            Connect_conv(tch0_layer[0].conv1, tch1_layer[0].conv1), #self.conv1
+            Connect_bn(n_channel, tch0_layer[0].bn1, tch1_layer[0].bn1), #self.bn1
             nn.ReLU(inplace=True),
             L0GateLayer2d(n_channel), #self.gate1
-            Connect_conv(tch0_layer[0].conv2, tch1_layer[0].conv2).conv, # self.conv2
-            Connect_bn(n_channel, tch0_layer[0].bn2, tch1_layer[0].bn2).bn #self.bn2
+            Connect_conv(tch0_layer[0].conv2, tch1_layer[0].conv2), # self.conv2
+            Connect_bn(n_channel, tch0_layer[0].bn2, tch1_layer[0].bn2) #self.bn2
         )
         self.gate1 = self.block0[3]
         # second block
         self.block1 = nn.Sequential(
-            Connect_conv(tch0_layer[1].conv1, tch1_layer[1].conv1).conv, #self.conv3 =
-            Connect_bn(n_channel, tch0_layer[1].bn1, tch1_layer[1].bn1).bn, # self.bn3
+            Connect_conv(tch0_layer[1].conv1, tch1_layer[1].conv1), #self.conv3 =
+            Connect_bn(n_channel, tch0_layer[1].bn1, tch1_layer[1].bn1), # self.bn3
             nn.ReLU(inplace=True),
             L0GateLayer2d(n_channel), # self.gate2            
-            Connect_conv(tch0_layer[1].conv2, tch1_layer[1].conv2).conv, # self.conv4
-            Connect_bn(n_channel, tch0_layer[1].bn2, tch1_layer[1].bn2).bn # self.bn4
+            Connect_conv(tch0_layer[1].conv2, tch1_layer[1].conv2), # self.conv4
+            Connect_bn(n_channel, tch0_layer[1].bn4, tch1_layer[1].bn2) # self.bn4
         )
         self.gate2 = self.block1[3]
 
@@ -105,14 +89,12 @@ class Layer_l0(nn.Module):
         # first block
         x = self.block0(x)
         x += identity
-        x = self.relu(x)
         x = self.main_gate(x, main_mask)
 
         # second block
         identity = x
         x = self.block0(x)
         x += identity
-        x = self.relu(x)
         x = self.main_gate(x, main_mask)
 
         return x
@@ -186,16 +168,14 @@ class Layer_l0(nn.Module):
 class Student(nn.Module):
     def __init__(self, teacher0, teacher1):
         super().__init__()
-        self.conv1 = Connect_1st_conv(teacher0.conv1, teacher1.conv1).conv
-        self.bn1 = Connect_bn(64 * 2, teacher0.bn1, teacher1.bn1).bn
+        self.conv1 = connect_first_conv2d(teacher0.conv1, teacher1.conv1)
+        self.bn1 = Connect_bn(64 * 2, teacher0.bn1, teacher1.bn1)
         self.relu = nn.ReLU()
 
         self.layer1 = Layer_l0(teacher0.layer1, teacher1.layer1)
         self.gate = self.layer1.main_gate
         self.layer2 = Layer_l0(teacher0.layer2, teacher1.layer2)
         self.layer3 = Layer_l0(teacher0.layer3, teacher1.layer3)
-        self.layer4 = Layer_l0(teacher0.layer4, teacher1.layer4)
-
 
         self.layers = [self.layer1, self.layer2, self.layer3]
 
@@ -256,5 +236,108 @@ class Student(nn.Module):
 
         return values
 
-student = Student(teacher0, teacher1)
-#%%
+model = Student(teacher0, teacher1)
+
+#%% prepare data
+num_train = 2600+2200
+num_val = 2200//2
+num_test = 2200//2
+split1 = num_val+num_train
+split2 = num_val+num_train + num_test
+neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
+pos_all = torch.load('./data/pos_all.pt')
+
+train_dataset = Data.TensorDataset(torch.cat((pos_all[:num_train], neg_all[:num_train]), dim=0), \
+                torch.cat((torch.ones(num_train, dtype=int), torch.zeros(num_train,  dtype=int)), dim=0))
+val_dataset = Data.TensorDataset(torch.cat((pos_all[num_train:split1],neg_all[num_train:split1]), dim=0), \
+                torch.cat((torch.ones(num_val, dtype=int), torch.zeros(num_val, dtype=int)), dim=0))
+test_dataset = Data.TensorDataset(torch.cat((pos_all[split1:split2], neg_all[split1:split2]), dim=0), \
+                torch.cat((torch.ones(num_test, dtype=int), torch.zeros(num_test, dtype=int)), dim=0))
+train_batchsize = 64
+eval_batchsize = 32
+train_loader = DataLoader(train_dataset, train_batchsize, shuffle=True)                                      
+validation_loader = DataLoader(val_dataset, eval_batchsize)
+test_loader = DataLoader(test_dataset, eval_batchsize)
+
+
+best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
+train_accs = []
+val_accs = []
+
+opt = {'epochs':100}
+optimizer = torch.optim.RAdam(model.parameters(),
+                lr= 0.001,
+                betas=(0.9, 0.999), 
+                eps=1e-8,
+                weight_decay=0)
+loss_func = nn.CrossEntropyLoss()
+
+for epoch in range(opt['epochs']):
+    model.train()
+
+    # print training info
+    print("### Epoch {}:".format(epoch))
+    total_train_examples = 0
+    num_correct_train = 0
+
+    # for batch_index, (inputs, gt_label) in tqdm(enumerate(train_loader), total=len(train_dataset)//train_batchsize):
+    for batch_index, (inputs, gt_label) in enumerate(train_loader):
+        inputs = inputs.cuda()
+        gt_label = gt_label.cuda()
+        optimizer.zero_grad()
+        predictions = model(inputs)
+        loss = loss_func(predictions, gt_label)
+        loss.backward()
+        optimizer.step()
+
+        _, predicted_class = predictions.max(1)
+        total_train_examples += predicted_class.size(0)
+        num_correct_train += predicted_class.eq(gt_label).sum().item()
+
+    # get results
+    train_acc = num_correct_train / total_train_examples
+    print("Training accuracy: {}".format(train_acc))
+    train_accs.append(train_acc)
+
+    # evaluation
+    total_val_examples = 0
+    num_correct_val = 0
+    model.eval()
+    with torch.no_grad(): # don't save parameter gradients/changes since this is not for model training
+        # for batch_index, (inputs, gt_label) in tqdm(enumerate(validation_loader), total=len(validation_dataset)//eval_batchsize):
+        for batch_index, (inputs, gt_label) in enumerate(validation_loader):
+            inputs = inputs.cuda()
+            gt_label = gt_label.cuda()
+            predictions = model(inputs)
+
+            _, predicted_class = predictions.max(1)
+            total_val_examples += predicted_class.size(0)
+            num_correct_val += predicted_class.eq(gt_label).sum().item()
+
+        # get validation results
+        val_acc = num_correct_val / total_val_examples
+        print("Validation accuracy: {}".format(val_acc))
+        val_accs.append(val_acc)
+
+    # Finally, save model if the validation accuracy is the best so far
+    if val_acc > best_validation_accuracy:
+        best_validation_accuracy = val_acc
+        print("Validation accuracy improved; saving model.")
+        torch.save(model.state_dict(), f'teachers/teacher{id}.pt')
+
+
+#%% plot train and val results
+epochs_list = list(range(opt['epochs']))
+plt.figure()
+plt.plot(epochs_list, train_accs, 'b-', label='training set accuracy')
+plt.plot(epochs_list, val_accs, 'r-', label='validation set accuracy')
+plt.xlabel('epoch')
+plt.ylabel('prediction accuracy')
+plt.ylim(0.5, 1)
+plt.title('Classifier training evolution:\nprediction accuracy over time')
+plt.legend()
+plt.savefig(f'train_val{id}.png')
+plt.show()
+
+print('done')
+print('End date time ', datetime.now())
