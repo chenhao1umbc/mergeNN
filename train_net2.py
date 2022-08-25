@@ -43,7 +43,7 @@ model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3)
 model = model.cuda()
 
 #%% train_net
-id = DBC1 # for diff. runs
+id = 'DBC1' # for diff. runs
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
@@ -88,7 +88,6 @@ for epoch in range(opt['epochs']):
     num_correct_val = 0
     model.eval()
     with torch.no_grad(): # don't save parameter gradients/changes since this is not for model training
-        # for batch_index, (inputs, gt_label) in tqdm(enumerate(validation_loader), total=len(validation_dataset)//eval_batchsize):
         for batch_index, (inputs, gt_label) in enumerate(validation_loader):    
             inputs = inputs.cuda()
             gt_label = gt_label.cuda()

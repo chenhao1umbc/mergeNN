@@ -10,17 +10,13 @@ from datetime import datetime
 print('starting date time ', datetime.now())
 
 #%% prepare data
-neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
-pos_all = torch.load('./data/pos_all.pt')
-if True:  # if False means split by objects
-    idx = torch.randperm(pos_all.shape[0])
-    neg_all = neg_all[idx]
-    pos_all = pos_all[idx]
 num_train = 2600+2200
 num_val = 2200//2
 num_test = 2200//2
 split1 = num_val+num_train
 split2 = num_val+num_train + num_test
+neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
+pos_all = torch.load('./data/pos_all.pt')
 
 train_dataset = Data.TensorDataset(torch.cat((pos_all[:num_train], neg_all[:num_train]), dim=0), \
                 torch.cat((torch.ones(num_train, dtype=int), torch.zeros(num_train,  dtype=int)), dim=0))
@@ -28,6 +24,7 @@ val_dataset = Data.TensorDataset(torch.cat((pos_all[num_train:split1],neg_all[nu
                 torch.cat((torch.ones(num_val, dtype=int), torch.zeros(num_val, dtype=int)), dim=0))
 test_dataset = Data.TensorDataset(torch.cat((pos_all[split1:split2], neg_all[split1:split2]), dim=0), \
                 torch.cat((torch.ones(num_test, dtype=int), torch.zeros(num_test, dtype=int)), dim=0))
+
 train_batchsize = 64
 eval_batchsize = 32
 train_loader = DataLoader(train_dataset, train_batchsize, shuffle=True)                                      
@@ -35,14 +32,14 @@ validation_loader = DataLoader(val_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%% load model
-model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
 model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-# model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=True)
+# model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=False)
 # model.conv1 = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
 model = model.cuda()
 
 #%% train_net
-id = 'DBC0' # for diff. runs
+id = 'CIFAR1' # for diff. runs
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
@@ -87,7 +84,8 @@ for epoch in range(opt['epochs']):
     num_correct_val = 0
     model.eval()
     with torch.no_grad(): # don't save parameter gradients/changes since this is not for model training
-        for batch_index, (inputs, gt_label) in enumerate(validation_loader):
+        # for batch_index, (inputs, gt_label) in tqdm(enumerate(validation_loader), total=len(validation_dataset)//eval_batchsize):
+        for batch_index, (inputs, gt_label) in enumerate(validation_loader):    
             inputs = inputs.cuda()
             gt_label = gt_label.cuda()
             predictions = model(inputs)
