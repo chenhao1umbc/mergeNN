@@ -10,13 +10,17 @@ from datetime import datetime
 print('starting date time ', datetime.now())
 
 #%% prepare data
+neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
+pos_all = torch.load('./data/pos_all.pt')
+if True:  # if False means split by objects
+    idx = torch.randperm(pos_all.shape[0])
+    neg_all = neg_all[idx]
+    pos_all = pos_all[idx]
 num_train = 2600+2200
 num_val = 2200//2
 num_test = 2200//2
 split1 = num_val+num_train
 split2 = num_val+num_train + num_test
-neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
-pos_all = torch.load('./data/pos_all.pt')
 
 train_dataset = Data.TensorDataset(torch.cat((pos_all[:num_train], neg_all[:num_train]), dim=0), \
                 torch.cat((torch.ones(num_train, dtype=int), torch.zeros(num_train,  dtype=int)), dim=0))
@@ -38,7 +42,7 @@ model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3)
 model = model.cuda()
 
 #%% train_net
-id = 10 # for diff. runs
+id = DBC0 # for diff. runs
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
