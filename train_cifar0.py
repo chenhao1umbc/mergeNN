@@ -43,7 +43,7 @@ best_validation_accuracy = 0. # used to pick the best-performing model on the va
 train_accs = []
 val_accs = []
 
-opt = {'epochs':100}
+opt = {'epochs':200}
 optimizer = torch.optim.RAdam(model.parameters(),
                 lr= 0.001,
                 betas=(0.9, 0.999), 
