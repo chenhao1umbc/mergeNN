@@ -1,9 +1,7 @@
 #%%
-import torch
 from modules import *
 from utils import *
 from torch.utils.data import Dataset, DataLoader
-
 
 #%%
 teacher0 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
@@ -26,53 +24,60 @@ class Connect_conv(nn.Module):
         self.conv.weight.data *= 0
         self.conv.weight.data[:out_channels, :in_channels] = conv1.weight.data.detach().clone()
         self.conv.weight.data[out_channels:, in_channels:] = conv2.weight.data.detach().clone()
-    def forward(self, x):
-        return self.conv
 
 class Connect_bn(nn.Module):
     def __init__(self, n_channel, bn1, bn2):
         super().__init__()
-        self.out = nn.BatchNorm2d(n_channel)
-        self.out.weight.data[:n_channel//2] = bn1.weight.data.clone()
-        self.out.weight.data[n_channel//2:] = bn2.weight.data.clone()
-        self.out.bias.data[:n_channel//2] = bn1.bias.data.clone()
-        self.out.bias.data[n_channel//2:] = bn2.bias.data.clone()
-    def forward(self, x):    
-        return self.out
+        self.bn = nn.BatchNorm2d(n_channel)
+        self.bn.weight.data[:n_channel//2] = bn1.weight.data.clone()
+        self.bn.weight.data[n_channel//2:] = bn2.weight.data.clone()
+        self.bn.bias.data[:n_channel//2] = bn1.bias.data.clone()
+        self.bn.bias.data[n_channel//2:] = bn2.bias.data.clone()
 
+class Connect_fc(nn.Module):
+    def __init__(self, lin1: nn.Linear, lin2: nn.Linear) -> nn.Linear:
+        super().__init__()
+        in_features = lin1.in_features
+        self.fc = nn.Linear(in_features * 2, lin1.out_features)
+        self.fc.weight.data *= 0
+        self.fc.weight.data[:, :in_features] = lin1.weight.data.detach().clone() / 2
+        self.fc.weight.data[:, in_features:] = lin2.weight.data.detach().clone() / 2
+        self.fc.bias.data = lin1.bias.data.detach().clone() / 2 + lin2.bias.data.detach().clone() / 2
+    
 class Layer_l0(nn.Module):
     def __init__(self, tch0_layer, tch1_layer):
         super().__init__()
         self.relu = nn.ReLU()
 
-        n_channel = tch0_layer.conv1.out_channels * 2
+        n_channel = tch0_layer[0].conv1.out_channels * 2
         self.main_gate = L0GateLayer2d(n_channel)
 
         # downsample
-        if tch0_layer.downsample_conv is not None:
-            self.downsample_conv = connect_middle_conv(tch0_layer.downsample_conv, tch1_layer.downsample_conv)
+        if tch0_layer[0].downsample is not None:
+            self.downsample_conv = Connect_conv(tch0_layer[0].downsample[0], \
+                                    tch1_layer[0].downsample[0]).conv
             self.downsample_bn = nn.BatchNorm2d(n_channel)
         else:
             self.downsample_conv = None
 
         # first block
         self.block0 = nn.Sequential(
-            Connect_conv(tch0_layer[0].conv1, tch1_layer[0].conv1), #self.conv1
-            Connect_bn(n_channel, tch0_layer[0].bn1, tch1_layer[0].bn1), #self.bn1
+            Connect_conv(tch0_layer[0].conv1, tch1_layer[0].conv1).conv, #self.conv1
+            Connect_bn(n_channel, tch0_layer[0].bn1, tch1_layer[0].bn1).bn, #self.bn1
             nn.ReLU(inplace=True),
             L0GateLayer2d(n_channel), #self.gate1
-            Connect_conv(tch0_layer[0].conv2, tch1_layer[0].conv2), # self.conv2
-            Connect_bn(n_channel, tch0_layer[0].bn2, tch1_layer[0].bn2) #self.bn2
+            Connect_conv(tch0_layer[0].conv2, tch1_layer[0].conv2).conv, # self.conv2
+            Connect_bn(n_channel, tch0_layer[0].bn2, tch1_layer[0].bn2).bn #self.bn2
         )
         self.gate1 = self.block0[3]
         # second block
         self.block1 = nn.Sequential(
-            Connect_conv(tch0_layer[1].conv1, tch1_layer[1].conv1), #self.conv3 =
-            Connect_bn(n_channel, tch0_layer[1].bn1, tch1_layer[1].bn1), # self.bn3
+            Connect_conv(tch0_layer[1].conv1, tch1_layer[1].conv1).conv, #self.conv3 =
+            Connect_bn(n_channel, tch0_layer[1].bn1, tch1_layer[1].bn1).bn, # self.bn3
             nn.ReLU(inplace=True),
             L0GateLayer2d(n_channel), # self.gate2            
-            Connect_conv(tch0_layer[1].conv2, tch1_layer[1].conv2), # self.conv4
-            Connect_bn(n_channel, tch0_layer[1].bn4, tch1_layer[1].bn2) # self.bn4
+            Connect_conv(tch0_layer[1].conv2, tch1_layer[1].conv2).conv, # self.conv4
+            Connect_bn(n_channel, tch0_layer[1].bn2, tch1_layer[1].bn2).bn # self.bn4
         )
         self.gate2 = self.block1[3]
 
@@ -139,7 +144,7 @@ class Layer_l0(nn.Module):
         return out_importance_indices
 
     def gate_parameters(self):
-        return chain(self.main_gate.parameters(), self.gate1.parameters(), self.gate2.parameters(), self.gate3.parameters())
+        return chain(self.main_gate.parameters(), self.gate1.parameters(), self.gate2.parameters())
 
     def non_gate_parameters(self):
         parameters = [self.conv1.parameters(),
@@ -176,11 +181,11 @@ class Student(nn.Module):
         self.gate = self.layer1.main_gate
         self.layer2 = Layer_l0(teacher0.layer2, teacher1.layer2)
         self.layer3 = Layer_l0(teacher0.layer3, teacher1.layer3)
-
-        self.layers = [self.layer1, self.layer2, self.layer3]
+        self.layer4 = Layer_l0(teacher0.layer4, teacher1.layer4)
+        self.layers = [self.layer1, self.layer2, self.layer3, self.layer4]
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = connect_final_linear(teacher0.fc, teacher1.fc)
+        self.fc = Connect_fc(teacher0.fc, teacher1.fc).fc
 
     def forward(self, x):
         x = self.conv1(x)
@@ -195,7 +200,6 @@ class Student(nn.Module):
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-
         x = self.fc(x)
 
         return x
