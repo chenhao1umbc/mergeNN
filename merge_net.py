@@ -13,6 +13,18 @@ teacher1.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3,
 teacher1.load_state_dict(torch.load(f'teachers/teacher{10}.pt'))
 
 #%%
+class Connect_1stconv(nn.Module):
+    def __init__(self, conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
+        super().__init__()
+        """first conv is the conv at the beginning of resnet"""
+        ker_size = conv1.kernel_size
+        n_stride = conv1.stride
+        out_channels = conv1.out_channels
+        n_padding = conv1.padding
+        self.conv = nn.Conv2d(1, out_channels*2, ker_size, n_stride, n_padding, bias=False)
+        self.conv.weight.data[:out_channels] = conv1.weight.data.detach().clone()
+        self.conv.weight.data[out_channels:] = conv2.weight.data.detach().clone()
+        
 class Connect_conv(nn.Module):
     def __init__(self, conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
         super().__init__()
@@ -98,7 +110,7 @@ class Layer_l0(nn.Module):
 
         # second block
         identity = x
-        x = self.block0(x)
+        x = self.block1(x)
         x += identity
         x = self.main_gate(x, main_mask)
 
@@ -173,8 +185,8 @@ class Layer_l0(nn.Module):
 class Student(nn.Module):
     def __init__(self, teacher0, teacher1):
         super().__init__()
-        self.conv1 = connect_first_conv2d(teacher0.conv1, teacher1.conv1)
-        self.bn1 = Connect_bn(64 * 2, teacher0.bn1, teacher1.bn1)
+        self.conv1 = Connect_1stconv(teacher0.conv1, teacher1.conv1).conv
+        self.bn1 = Connect_bn(64 * 2, teacher0.bn1, teacher1.bn1).bn
         self.relu = nn.ReLU()
 
         self.layer1 = Layer_l0(teacher0.layer1, teacher1.layer1)
@@ -240,7 +252,7 @@ class Student(nn.Module):
 
         return values
 
-model = Student(teacher0, teacher1)
+model = Student(teacher0, teacher1).cuda()
 
 #%% prepare data
 num_train = 2600+2200
@@ -268,14 +280,17 @@ best_validation_accuracy = 0. # used to pick the best-performing model on the va
 train_accs = []
 val_accs = []
 
-opt = {'epochs':100}
-optimizer = torch.optim.RAdam(model.parameters(),
+optimizer1 = torch.optim.RAdam(model.parameters(),
                 lr= 0.001,
                 betas=(0.9, 0.999), 
                 eps=1e-8,
                 weight_decay=0)
+scheduler1 = torch.optim.lr_scheduler.MultiStepLR(optimizer1, milestones=[50, 70], gamma=0.1)
+optimizer2 = torch.optim.SGD(model.gate_parameters(), lr=0.2, momentum=0.9)
+scheduler2 = torch.optim.lr_scheduler.MultiStepLR(optimizer2, milestones=[], gamma=1)
+opt = {'epochs':100}
 loss_func = nn.CrossEntropyLoss()
-
+lamb = 0.05
 for epoch in range(opt['epochs']):
     model.train()
 
@@ -284,15 +299,20 @@ for epoch in range(opt['epochs']):
     total_train_examples = 0
     num_correct_train = 0
 
-    # for batch_index, (inputs, gt_label) in tqdm(enumerate(train_loader), total=len(train_dataset)//train_batchsize):
+    lamb += 0.05 * math.sqrt(lamb)
     for batch_index, (inputs, gt_label) in enumerate(train_loader):
         inputs = inputs.cuda()
         gt_label = gt_label.cuda()
-        optimizer.zero_grad()
+        optimizer1.zero_grad()
+        optimizer2.zero_grad()
+
         predictions = model(inputs)
-        loss = loss_func(predictions, gt_label)
+        main_loss = loss_func(predictions, gt_label)
+        l0_loss = lamb * model.l0_loss()
+        loss = main_loss + l0_loss
         loss.backward()
-        optimizer.step()
+        optimizer1.step()
+        optimizer2.step()
 
         _, predicted_class = predictions.max(1)
         total_train_examples += predicted_class.size(0)
@@ -307,8 +327,7 @@ for epoch in range(opt['epochs']):
     total_val_examples = 0
     num_correct_val = 0
     model.eval()
-    with torch.no_grad(): # don't save parameter gradients/changes since this is not for model training
-        # for batch_index, (inputs, gt_label) in tqdm(enumerate(validation_loader), total=len(validation_dataset)//eval_batchsize):
+    with torch.no_grad(): 
         for batch_index, (inputs, gt_label) in enumerate(validation_loader):
             inputs = inputs.cuda()
             gt_label = gt_label.cuda()
@@ -328,7 +347,8 @@ for epoch in range(opt['epochs']):
         best_validation_accuracy = val_acc
         print("Validation accuracy improved; saving model.")
         torch.save(model.state_dict(), f'teachers/teacher{id}.pt')
-
+    scheduler1.step()
+    scheduler2.step()
 
 #%% plot train and val results
 epochs_list = list(range(opt['epochs']))
