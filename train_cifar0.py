@@ -32,7 +32,7 @@ validation_loader = torch.utils.data.DataLoader(
 
 #%% load model
 model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
-model.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+model.conv1 = nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
 # model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=True)
 # model.conv1 = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
 model = model.cuda()
@@ -59,7 +59,6 @@ for epoch in range(opt['epochs']):
     total_train_examples = 0
     num_correct_train = 0
 
-    # for batch_index, (inputs, gt_label) in tqdm(enumerate(train_loader), total=len(train_dataset)//train_batchsize):
     for batch_index, (inputs, gt_label) in enumerate(train_loader):
         inputs = inputs.cuda()
         gt_label = gt_label.cuda()
