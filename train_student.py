@@ -4,8 +4,8 @@ from torch.optim.lr_scheduler import MultiStepLR
 import torch.nn.functional as F
 import math
 
-from modules import Teacher
-from modules import Student
+from modules_old import Teacher
+from modules_old import Student
 from utils import *
 from tqdm import tqdm
 import torchvision.transforms as transforms

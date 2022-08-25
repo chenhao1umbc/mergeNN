@@ -16,100 +16,6 @@ torch.backends.cudnn.benchmark = False
 print('done loading')
 
 #%%
-class Conv3x3(nn.Module):
-    def __init__(self, in_planes: int, out_planes: int, stride: int = 1):
-        super().__init__()
-        self.layer = nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, \
-            padding=1, groups=1, bias=False, dilation=1)
-    
-    def forward(self, x):
-        x = self.layer(x)
-        return x
-
-
-class Conv1x1(nn.Module):
-    def __init__(self, in_planes: int, out_planes: int, stride: int = 1):
-        super().__init__()
-        self.layer = nn.Conv2d(in_planes, out_planes, kernel_size=1,\
-             stride=stride, bias=False)
-    
-    def forward(self, x):
-        x = self.layer(x)
-        return x
-
-
-class Layer(nn.Module):
-    def __init__(self, inplanes: int, planes: int, stride: int = 1):
-        super(Layer, self).__init__()
-        self.relu = nn.ReLU(inplace=True)
-
-        # downsample
-        if stride != 1 or inplanes != planes:
-            self.downsample_conv = Conv1x1(inplanes, planes, stride)
-            self.downsample_bn = nn.BatchNorm2d(planes)
-        else:
-            self.downsample_conv = None
-
-        # first block
-        self.conv1 = Conv3x3(inplanes, planes, stride)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = Conv3x3(planes, planes)
-        self.bn2 = nn.BatchNorm2d(planes)
-
-        # second block
-        self.conv3 = Conv3x3(planes, planes)
-        self.bn3 = nn.BatchNorm2d(planes)
-        self.conv4 = Conv3x3(planes, planes)
-        self.bn4 = nn.BatchNorm2d(planes)
-
-        # third block
-        self.conv5 = Conv3x3(planes, planes)
-        self.bn5 = nn.BatchNorm2d(planes)
-        self.conv6 = Conv3x3(planes, planes)
-        self.bn6 = nn.BatchNorm2d(planes)
-
-    def forward(self, x):
-        identity = x
-        if self.downsample_conv is not None:
-            identity = self.downsample_conv(identity)
-            identity = self.downsample_bn(identity)
-
-        # first block
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-
-        out += identity
-        out = self.relu(out)
-
-        # second block
-        identity = out
-        out = self.conv3(out)
-        out = self.bn3(out)
-        out = self.relu(out)
-
-        out = self.conv4(out)
-        out = self.bn4(out)
-
-        out += identity
-        out = self.relu(out)
-
-        identity = out
-        out = self.conv5(out)
-        out = self.bn5(out)
-        out = self.relu(out)
-
-        out = self.conv6(out)
-        out = self.bn6(out)
-
-        out += identity
-        out = self.relu(out)
-        return out
-
-
 class L0GateLayer2d(nn.Module):
     def __init__(self, n_channels, loc_mean=1, loc_sd=0.01, beta=2 / 3, gamma=-0.1, zeta=1.1, fix_temp=True):
         super(L0GateLayer2d, self).__init__()
@@ -154,41 +60,105 @@ class L0GateLayer2d(nn.Module):
         return important_indices
 
 
-class L0Layer(nn.Module):
-    def __init__(self, layer1, layer2):
-        super(L0Layer, self).__init__()
+class Connect_1stconv(nn.Module):
+    def __init__(self, conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
+        super().__init__()
+        """first conv is the conv at the beginning of resnet"""
+        ker_size = conv1.kernel_size
+        n_stride = conv1.stride
+        out_channels = conv1.out_channels
+        n_padding = conv1.padding
+        self.conv = nn.Conv2d(1, out_channels*2, ker_size, n_stride, n_padding, bias=False)
+        self.conv.weight.data[:out_channels] = conv1.weight.data.detach().clone()
+        self.conv.weight.data[out_channels:] = conv2.weight.data.detach().clone()
+        
+
+class Connect_conv(nn.Module):
+    def __init__(self, conv1: nn.Conv2d, conv2: nn.Conv2d) -> nn.Conv2d:
+        super().__init__()
+        """middle conv is conv in layers/blocks"""
+        in_channels = conv1.in_channels
+        out_channels = conv1.out_channels
+        self.conv = nn.Conv2d(in_channels*2, out_channels*2, kernel_size=conv1.kernel_size, stride=conv1.stride,
+                        padding=conv1.padding, bias=False)
+        self.conv.weight.data *= 0
+        self.conv.weight.data[:out_channels, :in_channels] = conv1.weight.data.detach().clone()
+        self.conv.weight.data[out_channels:, in_channels:] = conv2.weight.data.detach().clone()
+
+
+class Connect_bn(nn.Module):
+    def __init__(self, n_channel, bn1, bn2):
+        super().__init__()
+        self.bn = nn.BatchNorm2d(n_channel)
+        self.bn.weight.data[:n_channel//2] = bn1.weight.data.clone()
+        self.bn.weight.data[n_channel//2:] = bn2.weight.data.clone()
+        self.bn.bias.data[:n_channel//2] = bn1.bias.data.clone()
+        self.bn.bias.data[n_channel//2:] = bn2.bias.data.clone()
+
+
+class Connect_fc(nn.Module):
+    def __init__(self, lin1: nn.Linear, lin2: nn.Linear) -> nn.Linear:
+        super().__init__()
+        in_features = lin1.in_features
+        self.fc = nn.Linear(in_features * 2, lin1.out_features)
+        self.fc.weight.data *= 0
+        self.fc.weight.data[:, :in_features] = lin1.weight.data.detach().clone() / 2
+        self.fc.weight.data[:, in_features:] = lin2.weight.data.detach().clone() / 2
+        self.fc.bias.data = lin1.bias.data.detach().clone() / 2 + lin2.bias.data.detach().clone() / 2
+
+
+class Prune_conv2d(nn.Module):
+    def __init__(self, conv: nn.Conv2d, in_index: Tensor, out_index: Tensor) -> nn.Conv2d:
+        super().__init__()
+        self.conv = nn.Conv2d(len(in_index), len(out_index), conv.kernel_size,
+                            stride=conv.stride, padding=conv.padding, bias=False)
+        self.conv.weight.data = conv.weight.data[out_index][:, in_index].detach().clone()
+
+
+class Prune_bn(nn.Module):
+    def __init__(self, bn, planes, indices):
+        super().__init__()
+        self.bn = nn.BatchNorm2d(planes)
+        self.bn.weight.data = bn.weight.data[indices]
+        self.bn.bias.data = bn.bias.data[indices]
+
+
+class Layer_l0(nn.Module):
+    def __init__(self, tch0_layer, tch1_layer):
+        super().__init__()
         self.relu = nn.ReLU()
 
-        planes = layer1.conv1.out_channels * 2
-        self.main_gate = L0GateLayer2d(planes)
+        n_channel = tch0_layer[0].conv1.out_channels * 2
+        self.main_gate = L0GateLayer2d(n_channel)
 
         # downsample
-        if layer1.downsample_conv is not None:
-            self.downsample_conv = connect_middle_conv(layer1.downsample_conv, layer2.downsample_conv)
-            self.downsample_bn = nn.BatchNorm2d(planes)
+        if tch0_layer[0].downsample is not None:
+            self.downsample_conv = Connect_conv(tch0_layer[0].downsample[0], \
+                                    tch1_layer[0].downsample[0]).conv
+            self.downsample_bn = nn.BatchNorm2d(n_channel)
         else:
             self.downsample_conv = None
 
         # first block
-        self.conv1 = connect_middle_conv(layer1.conv1, layer2.conv1)
-        self.gate1 = L0GateLayer2d(planes)
-        self.bn1 = connect_bn(planes, layer1.bn1, layer2.bn1)
-        self.conv2 = connect_middle_conv(layer1.conv2, layer2.conv2)
-        self.bn2 = connect_bn(planes, layer1.bn2, layer2.bn2)
-
+        self.block0 = nn.Sequential(
+            Connect_conv(tch0_layer[0].conv1, tch1_layer[0].conv1).conv, #self.conv1
+            Connect_bn(n_channel, tch0_layer[0].bn1, tch1_layer[0].bn1).bn, #self.bn1
+            nn.ReLU(inplace=True),
+            L0GateLayer2d(n_channel), #self.gate1
+            Connect_conv(tch0_layer[0].conv2, tch1_layer[0].conv2).conv, # self.conv2
+            Connect_bn(n_channel, tch0_layer[0].bn2, tch1_layer[0].bn2).bn #self.bn2
+        )
+        self.gate1 = self.block0[3]
         # second block
-        self.conv3 = connect_middle_conv(layer1.conv3, layer2.conv3)
-        self.gate2 = L0GateLayer2d(planes)
-        self.bn3 = connect_bn(planes, layer1.bn3, layer2.bn3)
-        self.conv4 = connect_middle_conv(layer1.conv4, layer2.conv4)
-        self.bn4 = connect_bn(planes, layer1.bn4, layer2.bn4)
-
-        # second block
-        self.conv5 = connect_middle_conv(layer1.conv5, layer2.conv5)
-        self.gate3 = L0GateLayer2d(planes)
-        self.bn5 = connect_bn(planes, layer1.bn5, layer2.bn5)
-        self.conv6 = connect_middle_conv(layer1.conv6, layer2.conv6)
-        self.bn6 = connect_bn(planes, layer1.bn6, layer2.bn6)
+        self.block1 = nn.Sequential(
+            Connect_conv(tch0_layer[1].conv1, tch1_layer[1].conv1).conv, #self.conv3 =
+            Connect_bn(n_channel, tch0_layer[1].bn1, tch1_layer[1].bn1).bn, # self.bn3
+            nn.ReLU(inplace=True),
+            L0GateLayer2d(n_channel), # self.gate2            
+            Connect_conv(tch0_layer[1].conv2, tch1_layer[1].conv2).conv, # self.conv4
+            Connect_bn(n_channel, tch0_layer[1].bn2, tch1_layer[1].bn2).bn # self.bn4
+        )
+        self.gate2 = self.block1[3]
 
     def forward(self, x, main_mask=None):
         if main_mask is None:
@@ -201,89 +171,52 @@ class L0Layer(nn.Module):
             identity = self.downsample_bn(identity)
 
         # first block
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.gate1(x)
-
-        x = self.conv2(x)
-        x = self.bn2(x)
-
+        x = self.block0(x)
         x += identity
-        x = self.relu(x)
         x = self.main_gate(x, main_mask)
 
         # second block
         identity = x
-        x = self.conv3(x)
-        x = self.bn3(x)
-        x = self.relu(x)
-        x = self.gate2(x)
-
-        x = self.conv4(x)
-        x = self.bn4(x)
-
+        x = self.block1(x)
         x += identity
-        x = self.relu(x)
-        x = self.main_gate(x, main_mask)
-
-        # second block
-        identity = x
-        x = self.conv5(x)
-        x = self.bn5(x)
-        x = self.relu(x)
-        x = self.gate3(x)
-
-        x = self.conv6(x)
-        x = self.bn6(x)
-
-        x += identity
-        x = self.relu(x)
         x = self.main_gate(x, main_mask)
 
         return x
 
     def l0_loss(self):
-        return self.main_gate.l0_loss() + self.gate1.l0_loss() + self.gate2.l0_loss() + self.gate3.l0_loss()
+        return self.main_gate.l0_loss() + self.gate1.l0_loss() + self.gate2.l0_loss()
 
-    def compress(self, in_importance_indices):
-        out_importance_indices = self.main_gate.important_indices().detach()
-        planes = len(out_importance_indices)
+    def compress(self, in_index):
+        out_index = self.main_gate.important_indices().detach()
+        n_outchannels = len(out_index)
 
         # downsample
         if self.downsample_conv is not None:
-            self.downsample_conv = compress_conv2d(self.downsample_conv, in_importance_indices, out_importance_indices)
-            self.downsample_bn = nn.BatchNorm2d(planes)
+            self.downsample_conv = compress_conv2d(self.downsample_conv, in_index, out_index)
+            self.downsample_bn = nn.BatchNorm2d(n_outchannels)
 
         # first block
-        important_indices_in_block = self.gate1.important_indices()
-        self.conv1 = compress_conv2d(self.conv1, in_importance_indices, important_indices_in_block)
-        self.bn1 = compress_bn(self.bn1, planes, important_indices_in_block)
-        self.conv2 = compress_conv2d(self.conv2, important_indices_in_block, out_importance_indices)
-        self.bn2 = compress_bn(self.bn2, planes, out_importance_indices)
+        block_index = self.gate1.important_indices()
+        self.conv1 = Prune_conv2d(self.conv1, in_index, block_index).conv
+        self.bn1 = Prune_bn(self.bn1, n_outchannels, block_index).bn
+        self.conv2 = Prune_conv2d(self.conv2, block_index, out_index).conv
+        self.bn2 = Prune_bn(self.bn2, n_outchannels, out_index).bn
 
         # second block
-        important_indices_in_block = self.gate2.important_indices()
-        self.conv3 = compress_conv2d(self.conv3, out_importance_indices, important_indices_in_block)
-        self.bn3 = compress_bn(self.bn3, planes, important_indices_in_block)
-        self.conv4 = compress_conv2d(self.conv4, important_indices_in_block, out_importance_indices)
-        self.bn4 = compress_bn(self.bn4, planes, out_importance_indices)
-
-        important_indices_in_block = self.gate3.important_indices()
-        self.conv5 = compress_conv2d(self.conv5, out_importance_indices, important_indices_in_block)
-        self.bn5 = compress_bn(self.bn5, planes, important_indices_in_block)
-        self.conv6 = compress_conv2d(self.conv6, important_indices_in_block, out_importance_indices)
-        self.bn6 = compress_bn(self.bn6, planes, out_importance_indices)
+        block_index = self.gate2.important_indices()
+        self.conv3 = Prune_conv2d(self.conv3, out_index, block_index).conv
+        self.bn3 = Prune_bn(self.bn3, n_outchannels, block_index).bn
+        self.conv4 = Prune_conv2d(self.conv4, block_index, out_index).conv
+        self.bn4 = Prune_bn(self.bn4, n_outchannels, out_index).bn
 
         delattr(self, 'main_gate')
         delattr(self, 'gate1')
         delattr(self, 'gate2')
-        delattr(self, 'gate3')
         self.forward = types.MethodType(new_forward, self)
-        return out_importance_indices
+        return out_index
 
     def gate_parameters(self):
-        return chain(self.main_gate.parameters(), self.gate1.parameters(), self.gate2.parameters(), self.gate3.parameters())
+        return chain(self.main_gate.parameters(), self.gate1.parameters(), self.gate2.parameters())
 
     def non_gate_parameters(self):
         parameters = [self.conv1.parameters(),
@@ -293,11 +226,7 @@ class L0Layer(nn.Module):
                       self.conv3.parameters(),
                       self.bn3.parameters(),
                       self.conv4.parameters(),
-                      self.bn4.parameters(),
-                      self.conv5.parameters(),
-                      self.bn5.parameters(),
-                      self.conv6.parameters(),
-                      self.bn6.parameters()]
+                      self.bn4.parameters()]
         if self.downsample_conv is not None:
             parameters += [self.downsample_conv.parameters(),
                            self.downsample_bn.parameters()]
@@ -307,65 +236,25 @@ class L0Layer(nn.Module):
     def gate_values(self):
         """used only for plots"""
         return [self.main_gate.importance_of_features(), self.gate1.importance_of_features(),
-                self.gate2.importance_of_features(), self.gate3.importance_of_features()]
-
-
-class Teacher(nn.Module):
-    def __init__(self) -> None:
-        super(Teacher, self).__init__()
-        self.inplanes = 64
-
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.relu = nn.ReLU(inplace=True)
-
-        self.layer1 = Layer(16, 16, stride=1)
-        self.layer2 = Layer(16, 32, stride=2)
-        self.layer3 = Layer(32, 64, stride=2)
-
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(64, 100)
-
-        # initialization of weights
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-
-        return x
+                self.gate2.importance_of_features()]
 
 
 class Student(nn.Module):
     def __init__(self, teacher0, teacher1):
-        super(Student, self).__init__()
-        self.conv1 = connect_first_conv2d(teacher0.conv1, teacher1.conv1)
-        self.bn1 = connect_bn(64 * 2, teacher0.bn1, teacher1.bn1)
+        super().__init__()
+        self.conv1 = Connect_1stconv(teacher0.conv1, teacher1.conv1).conv
+        self.bn1 = Connect_bn(64 * 2, teacher0.bn1, teacher1.bn1).bn
         self.relu = nn.ReLU()
 
-        self.layer1 = L0Layer(teacher0.layer1, teacher1.layer1)
+        self.layer1 = Layer_l0(teacher0.layer1, teacher1.layer1)
         self.gate = self.layer1.main_gate
-        self.layer2 = L0Layer(teacher0.layer2, teacher1.layer2)
-        self.layer3 = L0Layer(teacher0.layer3, teacher1.layer3)
-
-        self.layers = [self.layer1, self.layer2, self.layer3]
+        self.layer2 = Layer_l0(teacher0.layer2, teacher1.layer2)
+        self.layer3 = Layer_l0(teacher0.layer3, teacher1.layer3)
+        self.layer4 = Layer_l0(teacher0.layer4, teacher1.layer4)
+        self.layers = [self.layer1, self.layer2, self.layer3, self.layer4]
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = connect_final_linear(teacher0.fc, teacher1.fc)
+        self.fc = Connect_fc(teacher0.fc, teacher1.fc).fc
 
     def forward(self, x):
         x = self.conv1(x)
@@ -380,7 +269,6 @@ class Student(nn.Module):
 
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-
         x = self.fc(x)
 
         return x
@@ -420,4 +308,5 @@ class Student(nn.Module):
             values += layer.gate_values()
 
         return values
+
 

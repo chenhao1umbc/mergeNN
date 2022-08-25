@@ -4,7 +4,7 @@ from torch.optim import SGD
 from torch.optim.lr_scheduler import MultiStepLR
 import torch.nn.functional as F
 
-from modules import Teacher
+from modules_old import Teacher
 from utils import plot_history
 
 from tqdm import tqdm
