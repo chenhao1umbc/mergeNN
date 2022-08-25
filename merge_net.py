@@ -55,7 +55,21 @@ class Connect_fc(nn.Module):
         self.fc.weight.data[:, :in_features] = lin1.weight.data.detach().clone() / 2
         self.fc.weight.data[:, in_features:] = lin2.weight.data.detach().clone() / 2
         self.fc.bias.data = lin1.bias.data.detach().clone() / 2 + lin2.bias.data.detach().clone() / 2
-    
+
+class Prune_conv2d(nn.Module):
+    def __init__(self, conv: nn.Conv2d, in_index: Tensor, out_index: Tensor) -> nn.Conv2d:
+        super().__init__()
+        self.conv = nn.Conv2d(len(in_index), len(out_index), conv.kernel_size,
+                            stride=conv.stride, padding=conv.padding, bias=False)
+        self.conv.weight.data = conv.weight.data[out_index][:, in_index].detach().clone()
+
+class Prune_bn(nn.Module):
+    def __init__(self, bn, planes, indices):
+        super().__init__()
+        self.bn = nn.BatchNorm2d(planes)
+        self.bn.weight.data = bn.weight.data[indices]
+        self.bn.bias.data = bn.bias.data[indices]
+
 class Layer_l0(nn.Module):
     def __init__(self, tch0_layer, tch1_layer):
         super().__init__()
@@ -119,41 +133,34 @@ class Layer_l0(nn.Module):
     def l0_loss(self):
         return self.main_gate.l0_loss() + self.gate1.l0_loss() + self.gate2.l0_loss()
 
-    def compress(self, in_importance_indices):
-        out_importance_indices = self.main_gate.important_indices().detach()
-        planes = len(out_importance_indices)
+    def compress(self, in_index):
+        out_index = self.main_gate.important_indices().detach()
+        n_outchannels = len(out_index)
 
         # downsample
         if self.downsample_conv is not None:
-            self.downsample_conv = compress_conv2d(self.downsample_conv, in_importance_indices, out_importance_indices)
-            self.downsample_bn = nn.BatchNorm2d(planes)
+            self.downsample_conv = compress_conv2d(self.downsample_conv, in_index, out_index)
+            self.downsample_bn = nn.BatchNorm2d(n_outchannels)
 
         # first block
-        important_indices_in_block = self.gate1.important_indices()
-        self.conv1 = compress_conv2d(self.conv1, in_importance_indices, important_indices_in_block)
-        self.bn1 = compress_bn(self.bn1, planes, important_indices_in_block)
-        self.conv2 = compress_conv2d(self.conv2, important_indices_in_block, out_importance_indices)
-        self.bn2 = compress_bn(self.bn2, planes, out_importance_indices)
+        block_index = self.gate1.important_indices()
+        self.conv1 = Prune_conv2d(self.conv1, in_index, block_index).conv
+        self.bn1 = Prune_bn(self.bn1, n_outchannels, block_index).bn
+        self.conv2 = Prune_conv2d(self.conv2, block_index, out_index).conv
+        self.bn2 = Prune_bn(self.bn2, n_outchannels, out_index).bn
 
         # second block
-        important_indices_in_block = self.gate2.important_indices()
-        self.conv3 = compress_conv2d(self.conv3, out_importance_indices, important_indices_in_block)
-        self.bn3 = compress_bn(self.bn3, planes, important_indices_in_block)
-        self.conv4 = compress_conv2d(self.conv4, important_indices_in_block, out_importance_indices)
-        self.bn4 = compress_bn(self.bn4, planes, out_importance_indices)
-
-        important_indices_in_block = self.gate3.important_indices()
-        self.conv5 = compress_conv2d(self.conv5, out_importance_indices, important_indices_in_block)
-        self.bn5 = compress_bn(self.bn5, planes, important_indices_in_block)
-        self.conv6 = compress_conv2d(self.conv6, important_indices_in_block, out_importance_indices)
-        self.bn6 = compress_bn(self.bn6, planes, out_importance_indices)
+        block_index = self.gate2.important_indices()
+        self.conv3 = Prune_conv2d(self.conv3, out_index, block_index).conv
+        self.bn3 = Prune_bn(self.bn3, n_outchannels, block_index).bn
+        self.conv4 = Prune_conv2d(self.conv4, block_index, out_index).conv
+        self.bn4 = Prune_bn(self.bn4, n_outchannels, out_index).bn
 
         delattr(self, 'main_gate')
         delattr(self, 'gate1')
         delattr(self, 'gate2')
-        delattr(self, 'gate3')
         self.forward = types.MethodType(new_forward, self)
-        return out_importance_indices
+        return out_index
 
     def gate_parameters(self):
         return chain(self.main_gate.parameters(), self.gate1.parameters(), self.gate2.parameters())
@@ -166,11 +173,7 @@ class Layer_l0(nn.Module):
                       self.conv3.parameters(),
                       self.bn3.parameters(),
                       self.conv4.parameters(),
-                      self.bn4.parameters(),
-                      self.conv5.parameters(),
-                      self.bn5.parameters(),
-                      self.conv6.parameters(),
-                      self.bn6.parameters()]
+                      self.bn4.parameters()]
         if self.downsample_conv is not None:
             parameters += [self.downsample_conv.parameters(),
                            self.downsample_bn.parameters()]
