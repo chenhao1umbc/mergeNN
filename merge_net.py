@@ -3,25 +3,19 @@ from modules import *
 from utils import *
 from torch.utils.data import Dataset, DataLoader
 
-#%%
-teacher0 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
-teacher0.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-teacher0.load_state_dict(torch.load(f'teachers/teacher{11}.pt'))
-
-teacher1 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
-teacher1.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-teacher1.load_state_dict(torch.load(f'teachers/teacher{10}.pt'))
-
-model = Student(teacher0, teacher1).cuda()
 
 #%% prepare data
+neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
+pos_all = torch.load('./data/pos_all.pt')
+if True:  # if False means split by objects
+    idx = torch.randperm(pos_all.shape[0])
+    neg_all = neg_all[idx]
+    pos_all = pos_all[idx]
 num_train = 2600+2200
 num_val = 2200//2
 num_test = 2200//2
 split1 = num_val+num_train
 split2 = num_val+num_train + num_test
-neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
-pos_all = torch.load('./data/pos_all.pt')
 
 train_dataset = Data.TensorDataset(torch.cat((pos_all[:num_train], neg_all[:num_train]), dim=0), \
                 torch.cat((torch.ones(num_train, dtype=int), torch.zeros(num_train,  dtype=int)), dim=0))
@@ -35,7 +29,20 @@ train_loader = DataLoader(train_dataset, train_batchsize, shuffle=True)
 validation_loader = DataLoader(val_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
+#%%
+id0, id1 = 'DBC0', 'DBC1'
+teacher0 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+teacher0.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+# teacher0.load_state_dict(torch.load(f'teachers/teacher{id0}.pt'))
 
+teacher1 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
+teacher1.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+teacher1.load_state_dict(torch.load(f'teachers/teacher{id1}.pt'))
+
+model = Student(teacher0, teacher1).cuda()
+
+#%% train_net
+id = 'DBC_merge_goodnbad'
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
@@ -117,7 +124,7 @@ plt.plot(epochs_list, train_accs, 'b-', label='training set accuracy')
 plt.plot(epochs_list, val_accs, 'r-', label='validation set accuracy')
 plt.xlabel('epoch')
 plt.ylabel('prediction accuracy')
-plt.ylim(0.5, 1)
+plt.ylim(0.01, 1)
 plt.title('Classifier training evolution:\nprediction accuracy over time')
 plt.legend()
 plt.savefig(f'train_val{id}.png')
