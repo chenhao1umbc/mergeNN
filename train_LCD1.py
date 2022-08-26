@@ -11,7 +11,7 @@ print('starting date time ', datetime.now())
 
 #%% prepare data
 neg, pos = torch.load('./data/LCD/neg_pos.pt') # check prep_data.py for more info
-neg_all, pos_all = neg.reshape(-1,64,64), pos.reshape(-1,64,64)
+neg_all, pos_all = neg.reshape(-1,1,64,64), pos.reshape(-1,1,64,64)
 if True:  # if False means split by objects
     idx = torch.randperm(pos_all.shape[0])
     neg_all = neg_all[idx]
