@@ -11,8 +11,8 @@ print('starting date time ', datetime.now())
 
 #%% prepare data
 neg, pos = torch.load('./data/LCD/neg_pos.pt') # neg and pos each has [1156,32,64,64]
-neg = torch.stack((neg[:,:8],neg[:,8:16],neg[:,16:24], neg[:,24:]), dim=0)
-pos = torch.stack((pos[:,:8],pos[:,8:16],pos[:,16:24], pos[:,24:]), dim=0) # shape [1156*4, 8, 64, 64]
+neg = torch.cat((neg[:,:8],neg[:,8:16],neg[:,16:24], neg[:,24:]), dim=0)
+pos = torch.cat((pos[:,:8],pos[:,8:16],pos[:,16:24], pos[:,24:]), dim=0) # shape [1156*4, 8, 64, 64]
 if True:  # if False means split by objects
     idx = torch.randperm(pos.shape[0])
     neg_all = neg[idx][:,None]
@@ -39,7 +39,7 @@ test_loader = DataLoader(test_dataset, eval_batchsize)
 from modules import *
 model = Resnet3D().cuda()
 
-id = 'res3d0' # for diff. runs
+id = 'res3d1' # for diff. runs
 fig_loc = './data/results/figures/'
 mod_loc = './data/results/models/'
 if not(os.path.isdir(fig_loc + f'/{id}/')): 

@@ -17,7 +17,8 @@ print('done loading')
 
 #%%
 class L0GateLayer(nn.Module):
-    def __init__(self, n_channels, loc_mean=1, loc_sd=0.01, beta=2 / 3, gamma=-0.1, zeta=1.1, fix_temp=True):
+    def __init__(self, n_channels, loc_mean=1, loc_sd=0.01, beta=2 / 3, \
+            gamma=-0.1, zeta=1.1, fix_temp=True, _3d=False):
         super(L0GateLayer, self).__init__()
         self.n_channels = n_channels
         self.loc = nn.Parameter(torch.zeros(n_channels).normal_(loc_mean, loc_sd))
@@ -26,13 +27,20 @@ class L0GateLayer(nn.Module):
         self.gamma = gamma
         self.zeta = zeta
         self.gamma_zeta_ratio = math.log(-gamma / zeta)
+        self._3d = _3d
 
     def forward(self, x, mask=None):
         if mask is None:
             mask = self.mask(x)
-        x = x.permute(2, 3, 0, 1)
+        if not self._3d :
+            x = x.permute(2, 3, 0, 1)
+        else:
+            x = x.permute(2, 3, 4, 0, 1)
         x = x * mask
-        x = x.permute(2, 3, 0, 1)
+        if not self._3d:
+            x = x.permute(2, 3, 0, 1)
+        else:
+            x = x.permute(3,4, 0, 1,2)
         return x
 
     def mask(self, x):
@@ -426,44 +434,44 @@ class Layer_l03d(nn.Module):
         self.relu = nn.ReLU()
 
         n_channel = cl0_layer[0].conv1.out_channels * 2
-        self.main_gate = L0GateLayer(n_channel)
+        self.main_gate = L0GateLayer(n_channel, _3d=True)
 
         # downsample
         if cl0_layer[0].downsample is not None:
             self.downsample_conv = Connect_conv(cl0_layer[0].downsample.downsample[0], \
-                                    cl1_layer[0].downsample.downsample[0]).conv
-            self.downsample_bn = nn.BatchNorm2d(n_channel)
+                                    cl1_layer[0].downsample.downsample[0], _3d=True).conv
+            self.downsample_bn = nn.BatchNorm3d(n_channel)
         else:
             self.downsample_conv = None
 
         # first block
         self.block0 = nn.Sequential(
-            Connect_conv(cl0_layer[0].conv1, cl1_layer[0].conv1).conv, #self.conv1
-            Connect_bn(n_channel, cl0_layer[0].bn1, cl1_layer[0].bn1).bn, #self.bn1
+            Connect_conv(cl0_layer[0].conv1, cl1_layer[0].conv1, _3d=True).conv, #self.conv1
+            Connect_bn(n_channel, cl0_layer[0].bn1, cl1_layer[0].bn1, _3d=True).bn, #self.bn1
             nn.ReLU(inplace=True),
-            L0GateLayer(n_channel), #self.gate1
-            Connect_conv(cl0_layer[0].conv2, cl1_layer[0].conv2).conv, # self.conv2
-            Connect_bn(n_channel, cl0_layer[0].bn2, cl1_layer[0].bn2).bn #self.bn2
+            L0GateLayer(n_channel, _3d=True), #self.gate1
+            Connect_conv(cl0_layer[0].conv2, cl1_layer[0].conv2, _3d=True).conv, # self.conv2
+            Connect_bn(n_channel, cl0_layer[0].bn2, cl1_layer[0].bn2, _3d=True).bn #self.bn2
         )
         self.gate1 = self.block0[3]
         # second block
         self.block1 = nn.Sequential(
-            Connect_conv(cl0_layer[1].conv1, cl1_layer[1].conv1).conv, #self.conv3 =
-            Connect_bn(n_channel, cl0_layer[1].bn1, cl1_layer[1].bn1).bn, # self.bn3
+            Connect_conv(cl0_layer[1].conv1, cl1_layer[1].conv1, _3d=True).conv, #self.conv3 =
+            Connect_bn(n_channel, cl0_layer[1].bn1, cl1_layer[1].bn1, _3d=True).bn, # self.bn3
             nn.ReLU(inplace=True),
-            L0GateLayer(n_channel), # self.gate2            
-            Connect_conv(cl0_layer[1].conv2, cl1_layer[1].conv2).conv, # self.conv4
-            Connect_bn(n_channel, cl0_layer[1].bn2, cl1_layer[1].bn2).bn # self.bn4
+            L0GateLayer(n_channel, _3d=True), # self.gate2            
+            Connect_conv(cl0_layer[1].conv2, cl1_layer[1].conv2, _3d=True).conv, # self.conv4
+            Connect_bn(n_channel, cl0_layer[1].bn2, cl1_layer[1].bn2, _3d=True).bn # self.bn4
         )
         self.gate2 = self.block1[3]
         # third block
         self.block2 = nn.Sequential(
-            Connect_conv(cl0_layer[1].conv1, cl1_layer[1].conv1).conv, #self.conv5 =
-            Connect_bn(n_channel, cl0_layer[1].bn1, cl1_layer[1].bn1).bn, # self.bn5
+            Connect_conv(cl0_layer[1].conv1, cl1_layer[1].conv1, _3d=True).conv, #self.conv5 =
+            Connect_bn(n_channel, cl0_layer[1].bn1, cl1_layer[1].bn1, _3d=True).bn, # self.bn5
             nn.ReLU(inplace=True),
-            L0GateLayer(n_channel), # self.gate3            
-            Connect_conv(cl0_layer[1].conv2, cl1_layer[1].conv2).conv, # self.conv6
-            Connect_bn(n_channel, cl0_layer[1].bn2, cl1_layer[1].bn2).bn # self.bn6
+            L0GateLayer(n_channel, _3d=True), # self.gate3            
+            Connect_conv(cl0_layer[1].conv2, cl1_layer[1].conv2, _3d=True).conv, # self.conv6
+            Connect_bn(n_channel, cl0_layer[1].bn2, cl1_layer[1].bn2, _3d=True).bn # self.bn6
         )
         self.gate3 = self.block2[3]
 
@@ -487,6 +495,13 @@ class Layer_l03d(nn.Module):
         x = self.block1(x)
         x += identity
         x = self.main_gate(x, main_mask)
+
+        # third block
+        identity = x
+        x = self.block2(x)
+        x += identity
+        x = self.main_gate(x, main_mask)
+
 
         return x
 
@@ -640,8 +655,8 @@ class Resnet3D(nn.Module):
 class Judge3D(nn.Module):
     def __init__(self, client0, client1):
         super().__init__()
-        self.conv1 = Connect_1stconv(client0.conv1, client1.conv1).conv
-        self.bn1 = Connect_bn(16 * 2, client0.bn1, client1.bn1).bn
+        self.conv1 = Connect_1stconv(client0.conv1, client1.conv1, _3d=True).conv
+        self.bn1 = Connect_bn(16 * 2, client0.bn1, client1.bn1, _3d=True).bn
         self.relu = nn.ReLU()
 
         self.layer1 = Layer_l03d(client0.layer1, client1.layer1)

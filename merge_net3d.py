@@ -37,17 +37,25 @@ test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%%
 from modules import Resnet3D, Judge3D
-id0, id1 = 'DBC0', 'DBC1'
+id0, id1 = 'DBC0', 'res3d1'
 client0 = Resnet3D()
 # client0.load_state_dict(torch.load(f'teachers/teacher{id0}.pt'))
 
 client1 = Resnet3D()
-client1.load_state_dict(torch.load(f'./data/teacher{id1}.pt'))
+client1.load_state_dict(torch.load(f'./data/results/models/{id1}/model_{id1}.pt'))
 
 model = Judge3D(client0, client1).cuda()
 
 #%% train_net
-id = 'DBC_merge_goodnbad'
+id = 'res3d1_and_rand' # for diff. runs
+fig_loc = './data/results/merege/figures/'
+mod_loc = './data/results/merge/models/'
+if not(os.path.isdir(fig_loc + f'/{id}/')): 
+    print('made a new folder')
+    os.makedirs(fig_loc + f'{id}/')
+    os.makedirs(mod_loc + f'{id}/')
+fig_loc = fig_loc + f'{id}/'
+mod_loc = mod_loc + f'{id}/'
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
@@ -71,7 +79,7 @@ for epoch in range(opt['epochs']):
     total_train_examples = 0
     num_correct_train = 0
 
-    lamb += 0.05 * math.sqrt(lamb)
+    lamb += 0.05 * (lamb**0.5)
     for batch_index, (inputs, gt_label) in enumerate(train_loader):
         inputs = inputs.cuda()
         gt_label = gt_label.cuda()
@@ -119,6 +127,19 @@ for epoch in range(opt['epochs']):
         best_validation_accuracy = val_acc
         print("Validation accuracy improved; saving model.")
         torch.save(model.state_dict(), f'teachers/teacher{id}.pt')
+
+        epochs_list = list(range(epoch+1))
+        plt.figure()
+        plt.plot(epochs_list, train_accs, 'b-', label='training set accuracy')
+        plt.plot(epochs_list, val_accs, 'r-', label='validation set accuracy')
+        plt.xlabel('epoch')
+        plt.ylabel('prediction accuracy')
+        plt.ylim(0.5, 1)
+        plt.title('Classifier training evolution:\nprediction accuracy over time')
+        plt.legend()
+        plt.savefig(fig_loc+f'train_val{id}_{epoch}.png')
+        plt.show()
+
     scheduler1.step()
     scheduler2.step()
 
