@@ -1,19 +1,25 @@
-#%%
-from modules import *
+#%% load dependency
+import os
+import numpy as np
+from tqdm import tqdm
 from utils import *
 from torch.utils.data import Dataset, DataLoader
-
+from torchvision import transforms
+from skimage.io import imread
+from datetime import datetime
+print('starting date time ', datetime.now())
 
 #%% prepare data
-neg_all = torch.load('./data/neg_all.pt') # check prep_data.py for more info
-pos_all = torch.load('./data/pos_all.pt')
+neg, pos = torch.load('./data/LCD/neg_pos.pt') # neg and pos each has [1156,32,64,64]
+neg = torch.cat((neg[:,:8],neg[:,8:16],neg[:,16:24], neg[:,24:]), dim=0)
+pos = torch.cat((pos[:,:8],pos[:,8:16],pos[:,16:24], pos[:,24:]), dim=0) # shape [1156*4, 8, 64, 64]
 if True:  # if False means split by objects
-    idx = torch.randperm(pos_all.shape[0])
-    neg_all = neg_all[idx]
-    pos_all = pos_all[idx]
-num_train = 2600+2200
-num_val = 2200//2
-num_test = 2200//2
+    idx = torch.randperm(pos.shape[0])
+    neg_all = neg[idx][:,None]
+    pos_all = pos[idx][:,None]
+num_train = 3600
+num_val = 512
+num_test = 512
 split1 = num_val+num_train
 split2 = num_val+num_train + num_test
 
@@ -23,23 +29,22 @@ val_dataset = Data.TensorDataset(torch.cat((pos_all[num_train:split1],neg_all[nu
                 torch.cat((torch.ones(num_val, dtype=int), torch.zeros(num_val, dtype=int)), dim=0))
 test_dataset = Data.TensorDataset(torch.cat((pos_all[split1:split2], neg_all[split1:split2]), dim=0), \
                 torch.cat((torch.ones(num_test, dtype=int), torch.zeros(num_test, dtype=int)), dim=0))
-train_batchsize = 64
-eval_batchsize = 32
+train_batchsize = 128
+eval_batchsize = 64
 train_loader = DataLoader(train_dataset, train_batchsize, shuffle=True)                                      
 validation_loader = DataLoader(val_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%%
+from modules import Resnet3D, Judge
 id0, id1 = 'DBC0', 'DBC1'
-teacher0 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
-teacher0.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-# teacher0.load_state_dict(torch.load(f'teachers/teacher{id0}.pt'))
+client0 = Resnet3D()
+# client0.load_state_dict(torch.load(f'teachers/teacher{id0}.pt'))
 
-teacher1 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
-teacher1.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
-teacher1.load_state_dict(torch.load(f'teachers/teacher{id1}.pt'))
+client1 = Resnet3D()
+# client1.load_state_dict(torch.load(f'teachers/teacher{id1}.pt'))
 
-model = Judge(teacher0, teacher1).cuda()
+model = Judge(client0, client1).cuda()
 
 #%% train_net
 id = 'DBC_merge_goodnbad'

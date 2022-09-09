@@ -52,8 +52,6 @@ if False:
     torch.save(pos_all, './data/pos_all.pt')
     torch.save(pos_all, './data/pos_all.pt')
 
-
-
 #%% prepare data  -- DBC typical way, not save as .pt
 class DBCDataset(Dataset):
     def __init__(self, data_dir, img_size):
@@ -158,7 +156,7 @@ validation_loader = DataLoader(val_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%% Lung cancer data
-data = np.load('./data/LIDC_Latest.npy', allow_pickle = True)
+data = np.load('./data/LCD/LIDC_Latest.npy', allow_pickle = True)
 df = pd.DataFrame({'subtlety':data[:,0],
                            'internalStructure':data[:,1],
                            'calcification':data[:,2],
@@ -186,4 +184,4 @@ pos = np.stack(df1[df1['Malignancy']==1]['3D Volume'].to_numpy())
 n = torch.tensor(neg)
 p = torch.tensor(pos)
 min_n = min(n.shape[0], p.shape[0])
-torch.save([n[:min_n], p[:min_n]], 'neg_pos.pt')
+# torch.save([n[:min_n], p[:min_n]], 'neg_pos.pt')
