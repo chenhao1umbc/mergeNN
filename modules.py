@@ -665,7 +665,7 @@ class Judge3D(nn.Module):
         self.layer3 = Layer_l03d(client0.layer3, client1.layer3)
         self.layers = [self.layer1, self.layer2, self.layer3]
 
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.avgpool = nn.AdaptiveAvgPool3d(1)
         self.fc = Connect_fc(client0.fc, client1.fc).fc
 
     def forward(self, x):
