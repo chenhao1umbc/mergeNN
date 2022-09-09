@@ -36,15 +36,15 @@ validation_loader = DataLoader(val_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
 
 #%%
-from modules import Resnet3D, Judge
+from modules import Resnet3D, Judge3D
 id0, id1 = 'DBC0', 'DBC1'
 client0 = Resnet3D()
 # client0.load_state_dict(torch.load(f'teachers/teacher{id0}.pt'))
 
 client1 = Resnet3D()
-# client1.load_state_dict(torch.load(f'teachers/teacher{id1}.pt'))
+client1.load_state_dict(torch.load(f'./data/teacher{id1}.pt'))
 
-model = Judge(client0, client1).cuda()
+model = Judge3D(client0, client1).cuda()
 
 #%% train_net
 id = 'DBC_merge_goodnbad'

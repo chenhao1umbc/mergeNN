@@ -430,8 +430,8 @@ class Layer_l03d(nn.Module):
 
         # downsample
         if cl0_layer[0].downsample is not None:
-            self.downsample_conv = Connect_conv(cl0_layer[0].downsample[0], \
-                                    cl1_layer[0].downsample[0]).conv
+            self.downsample_conv = Connect_conv(cl0_layer[0].downsample.downsample[0], \
+                                    cl1_layer[0].downsample.downsample[0]).conv
             self.downsample_bn = nn.BatchNorm2d(n_channel)
         else:
             self.downsample_conv = None
@@ -644,10 +644,10 @@ class Judge3D(nn.Module):
         self.bn1 = Connect_bn(16 * 2, client0.bn1, client1.bn1).bn
         self.relu = nn.ReLU()
 
-        self.layer1 = Layer_l0(client0.layer1, client1.layer1)
+        self.layer1 = Layer_l03d(client0.layer1, client1.layer1)
         self.gate = self.layer1.main_gate
-        self.layer2 = Layer_l0(client0.layer2, client1.layer2)
-        self.layer3 = Layer_l0(client0.layer3, client1.layer3)
+        self.layer2 = Layer_l03d(client0.layer2, client1.layer2)
+        self.layer3 = Layer_l03d(client0.layer3, client1.layer3)
         self.layers = [self.layer1, self.layer2, self.layer3]
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
