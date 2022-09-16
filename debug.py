@@ -11,7 +11,8 @@ print('starting date time ', datetime.now())
 
 #%% prepare data
 neg, pos = torch.load('./data/LCD/neg_pos.pt') # neg and pos each has [1156,32,64,64]
-
+# neg = torch.cat((neg[:,:8],neg[:,8:16],neg[:,16:24], neg[:,24:]), dim=0)
+# pos = torch.cat((pos[:,:8],pos[:,8:16],pos[:,16:24], pos[:,24:]), dim=0) # shape [1156*4, 8, 64, 64]
 if True:  # if False means split by objects
     idx = torch.randperm(pos.shape[0])
     neg_all = neg[idx][:,None]
@@ -29,7 +30,7 @@ val_dataset = Data.TensorDataset(torch.cat((pos_all[num_train:split1],neg_all[nu
 test_dataset = Data.TensorDataset(torch.cat((pos_all[split1:split2], neg_all[split1:split2]), dim=0), \
                 torch.cat((torch.ones(num_test, dtype=int), torch.zeros(num_test, dtype=int)), dim=0))
 train_batchsize = 64
-eval_batchsize = 32
+eval_batchsize = 64
 train_loader = DataLoader(train_dataset, train_batchsize, shuffle=True)                                      
 validation_loader = DataLoader(val_dataset, eval_batchsize)
 test_loader = DataLoader(test_dataset, eval_batchsize)
@@ -39,24 +40,24 @@ from modules import *
 class Resnet3D_m(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.conv1 = nn.Conv3d(1, 32, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv3d(1, 16, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm3d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
         self.relu = nn.ReLU(inplace=True)
         #(maxpool): Cifar does not have it.
         self.layer1 = nn.Sequential(
-            BasicBlock3D(32, 16),
+            BasicBlock3D(16, 16),
             BasicBlock3D(16, 16),
             )
         self.layer2 = nn.Sequential(
+            BasicBlock3D(16, 16, stride=2, downsample=Downsample3D(16, 16)),
+            BasicBlock3D(16, 16),
+            )
+        self.layer3 = nn.Sequential(
             BasicBlock3D(16, 32, stride=2, downsample=Downsample3D(16, 32)),
             BasicBlock3D(32, 32),
             )
-        self.layer3 = nn.Sequential(
-            BasicBlock3D(32, 21, stride=2, downsample=Downsample3D(32, 64)),
-            BasicBlock3D(32, 64),
-            )
         self.avgpool = nn.AdaptiveAvgPool3d(1)
-        self.fc = nn.Linear(64, 2)
+        self.fc = nn.Linear(32, 2)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.conv1(x)
@@ -72,7 +73,8 @@ class Resnet3D_m(nn.Module):
         x = self.fc(x)
         return x
 
-id = 'res3d0' # for diff. runs
+model = Resnet3D_m().cuda()
+id = 'res3d_m0' # for diff. runs
 fig_loc = './data/results/figures/'
 mod_loc = './data/results/models/'
 if not(os.path.isdir(fig_loc + f'/{id}/')): 
@@ -81,7 +83,6 @@ if not(os.path.isdir(fig_loc + f'/{id}/')):
     os.makedirs(mod_loc + f'{id}/')
 fig_loc = fig_loc + f'{id}/'
 mod_loc = mod_loc + f'{id}/'
-model = Resnet3D_m()
 
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []

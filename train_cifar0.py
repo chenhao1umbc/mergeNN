@@ -32,7 +32,7 @@ validation_loader = torch.utils.data.DataLoader(
 
 #%% load model
 model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
-model.conv1 = nn.Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False) # original 
 # model = torch.hub.load('pytorch/vision:v0.10.0', 'shufflenet_v2_x1_0', pretrained=True)
 # model.conv1 = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
 model = model.cuda()
@@ -44,11 +44,9 @@ train_accs = []
 val_accs = []
 
 opt = {'epochs':200}
-optimizer = torch.optim.RAdam(model.parameters(),
-                lr= 0.001,
-                betas=(0.9, 0.999), 
-                eps=1e-8,
-                weight_decay=0)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
+
 loss_func = nn.CrossEntropyLoss()
 
 for epoch in range(opt['epochs']):
@@ -101,7 +99,7 @@ for epoch in range(opt['epochs']):
         best_validation_accuracy = val_acc
         print("Validation accuracy improved; saving model.")
         torch.save(model.state_dict(), f'teachers/teacher{id}.pt')
-
+    scheduler.step()
 
 #%% plot train and val results
 epochs_list = list(range(opt['epochs']))
@@ -110,7 +108,7 @@ plt.plot(epochs_list, train_accs, 'b-', label='training set accuracy')
 plt.plot(epochs_list, val_accs, 'r-', label='validation set accuracy')
 plt.xlabel('epoch')
 plt.ylabel('prediction accuracy')
-plt.ylim(0.5, 1)
+plt.ylim(0.01, 1)
 plt.title('Classifier training evolution:\nprediction accuracy over time')
 plt.legend()
 plt.savefig(f'train_val{id}.png')
