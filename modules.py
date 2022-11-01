@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import torch.nn.functional as Func
 import torch.utils.data as Data
-import torch_optimizer as optim
 from itertools import chain
 import types
 
