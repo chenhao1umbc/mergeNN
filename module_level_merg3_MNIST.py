@@ -4,8 +4,6 @@ Resnet18 or shufflenet, which can be changed in the load model section
 """
 #%% load dependency
 import os
-from re import M
-os.environ["CUDA_VISIBLE_DEVICES"]="3"
 import numpy as np
 from tqdm import tqdm
 from utils import *
@@ -100,9 +98,8 @@ m32 = replace_relu(m32)
 
 #%%
 oc_sd=0.01
-loga1 = (torch.randn(3)*oc_sd).cuda().requires_grad_()
-loga2 = (torch.randn(3)*oc_sd).cuda().requires_grad_()
-print('initial loga', loga1, loga2)
+loga = (torch.randn(6)*oc_sd).cuda().requires_grad_()
+print('initial loga', loga)
 def hard_concrete(loga, batch_size=128):
     beta, gamma, zeta, eps = 2/3, -0.1, 1.1, 1e-20
     u = torch.rand(batch_size, loga.shape[0], device=loga.device)
@@ -111,24 +108,21 @@ def hard_concrete(loga, batch_size=128):
     z = hard_sigmoid(sbar)
     return z
 
-import inspect
-print(inspect.getsource(m11._forward_impl))
-
 #%%
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
 
-opt = {'epochs':15}
-optimizer = torch.optim.RAdam([loga1, loga2],
-                lr= 0.001,
+opt = {'epochs':150}
+optimizer = torch.optim.RAdam([loga],
+                lr= 1e-4,
                 betas=(0.9, 0.999), 
                 eps=1e-8,
                 weight_decay=0)
 loss_func = nn.CrossEntropyLoss()
 
 loss_tr, loss_val = [], []
-lamb = 1
+lamb = 5
 for epoch in range(opt['epochs']):
     # print training info
     print(f"### Epoch {epoch}:")
@@ -140,23 +134,21 @@ for epoch in range(opt['epochs']):
         inputs = inputs.cuda()
         gt_label = gt_label.cuda()
         optimizer.zero_grad()
-        z1 = hard_concrete(loga1, batch_size=gt_label.shape[0])
-        z2 = hard_concrete(loga2, batch_size=gt_label.shape[0])
-        half0 = m11(inputs).reshape(gt_label.shape[0], 128,7,7)*z1[:,0:1, None, None] 
-            # + m21(inputs).reshape(gt_label.shape[0], 128,7,7)*z1[:,1:2, None, None] 
-            # + m31(inputs).reshape(gt_label.shape[0], 128,7,7)*z1[:,2:3, None, None]
-        # pred0, pred1, pred2 = m12(half0)*z2[:,0:1], m22(half0)*z2[:,1:2], m32(half0)*z2[:,2:3]
-        # l0, l1, l2 = loss_func(pred0, gt_label), loss_func(pred1, gt_label), loss_func(pred2, gt_label)
-        # loss = l0 + l1 + l2 + lamb*(z1.mean() + z2.mean() - 2/3)
-        pred0, pred1 = m22(half0)*z2[:,1:2], m12(half0)*z2[:,0:1]
-        l0 = loss_func(pred0, gt_label) #loss_func(pred0, gt_label)#
-        loss = l0
+        z = hard_concrete(loga, batch_size=gt_label.shape[0])
+        half0 = m11(inputs).reshape(gt_label.shape[0], 128,7,7)*z[:,0:1, None, None] \
+            + m21(inputs).reshape(gt_label.shape[0], 128,7,7)*z[:,1:2, None, None] \
+            + m31(inputs).reshape(gt_label.shape[0], 128,7,7)*z[:,2:3, None, None]
+        pred0, pred1, pred2 = m12(half0)*z[:,3:4], m22(half0)*z[:,4:5], m32(half0)*z[:,5:6]
+        l0, l1, l2 = loss_func(pred0, gt_label), loss_func(pred1, gt_label), loss_func(pred2, gt_label)
+        # with torch.no_grad():
+        #     lamb = l0+l1+l2
+        loss = l0 + l1 + l2 + lamb*(z.mean() - 1/3)
         loss.backward()
         loss_tr.append(loss.cpu().detach().item())
         optimizer.step()
-        
-        print("yes")
-        g_ind = z2.argmax(dim=1)
+        # if batch_index%10 == 0:
+        #     print("laga", loga)      
+        g_ind = z[:, 3:].argmax(dim=1)
         pred = torch.stack((pred0, pred1, pred2), dim=1)
         predictions = pred[range(z.shape[0]),g_ind]
         _, predicted_class = predictions.max(1)
@@ -177,8 +169,9 @@ for epoch in range(opt['epochs']):
             inputs = inputs.cuda()
             gt_label = gt_label.cuda()
             z = hard_concrete(loga, batch_size=gt_label.shape[0])
-            half0 = m11(inputs)*z[:,0:1,None,None] + m21(inputs)*z[:,1:2,None,None] + m31(inputs)*z[:,2:3,None,None]
-            pred0, pred1, pred2 = m12(half0)*z[:,3:4], m22(half0)*z[:,4:5], m32(half0)*z[:,5:6]
+            half0 = m11(inputs)*z[:,0:1] + m21(inputs)*z[:,1:2] + m31(inputs)*z[:,2:3]
+            half0r = half0.reshape(gt_label.shape[0],128,7,7)
+            pred0, pred1, pred2 = m12(half0r)*z[:,3:4], m22(half0r)*z[:,4:5], m32(half0r)*z[:,5:6]
 
             g_ind = z[:, 3:].argmax(dim=1)
             pred = torch.stack((pred0, pred1, pred2), dim=1)

@@ -4,8 +4,6 @@ Resnet18 or shufflenet, which can be changed in the load model section
 """
 #%% load dependency
 import os
-from re import M
-os.environ["CUDA_VISIBLE_DEVICES"]="3"
 import numpy as np
 from tqdm import tqdm
 from utils import *
@@ -37,72 +35,39 @@ test_loader = torch.utils.data.DataLoader(
 
 #%%
 id0 = 'resnet18_mnist'
-def get_random_model(seed, load=False):
-    torch.manual_seed(seed)
-    model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
-    model.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False) # original
-    if load : model.load_state_dict(torch.load(f'teachers/{id0}.pt'))
-    for param in model.parameters():
-        param.requires_grad = False
-    return model
-t0 = get_random_model(0, load=True) # t0 is trained, t1-t3 are not trained
-for i in range(1,4):
-    exec(f"t{i} = get_random_model({i})")
 
-"swap t1 1st half, t2 second half with trained model"
-l = 60 #len(list(t0.parameters()))//2
-temp_dict = t1.state_dict().copy()
-for i, k in enumerate(t0.state_dict().keys()):
-    if i < 60:
-        if k in temp_dict.keys():
-            temp_dict[k] = t0.state_dict()[k]
-t1.load_state_dict(temp_dict, strict=False)
+t0 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+t0.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False) # original
+t0.load_state_dict(torch.load(f'teachers/{id0}.pt'))
 
-temp_dict = t2.state_dict().copy()
-for i, k in enumerate(t0.state_dict().keys()):
-    if i > 60:
-        if k in temp_dict.keys():
-            temp_dict[k] = t0.state_dict()[k]
-t2.load_state_dict(temp_dict, strict=False)
+t1 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+t1.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False) # original
+# t1.load_state_dict(torch.load(f'teachers/{id0}.pt'))
 
-for i in range(1,4):
-    exec(f"t{i} = t{i}.cuda()")
+t2 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+t2.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False) # original
+# t2.load_state_dict(torch.load(f'teachers/{id0}.pt'))
 
-"cut 3 models into 6 modules"
-import copy
-def split_model(m):
-    h1 = copy.deepcopy(m)
-    h2 = copy.deepcopy(m)
-    h1.layer3 = nn.Sequential()
-    h1.layer4 = nn.Sequential()
-    h1.avgpool = nn.Sequential()
-    h1.fc = nn.Sequential()
+t0.eval()
+for param0 in t0.parameters():
+    param0.requires_grad = False
 
-    h2.layer1 = nn.Sequential()
-    h2.layer2 = nn.Sequential()
-    h2.conv1 = nn.Sequential()
-    h2.bn1 = nn.Sequential()
-    h2.relu = nn.Sequential()
-    h2.maxpool = nn.Sequential()
-    return h1, h2
-m11, m12 = split_model(t1)
-m21, m22 = split_model(t2)
-m31, m32 = split_model(t3)
-def replace_relu(m):
-    m.layer3[0].relu = nn.ReLU()
-    m.layer3[1].relu = nn.ReLU()
-    m.layer4[0].relu = nn.ReLU()
-    m.layer4[1].relu = nn.ReLU()
-    return m
-m12 = replace_relu(m12)
-m22 = replace_relu(m22)
-m32 = replace_relu(m32)
+t1.eval()
+for param1 in t1.parameters():
+    param1.requires_grad = False
+
+t2.eval()
+for param1 in t2.parameters():
+    param1.requires_grad = False
+
+t0 = t0.cuda()
+t1 = t1.cuda()
+t2 = t2.cuda()
 
 #%%
 oc_sd=0.01
-loga1 = (torch.randn(3)*oc_sd).cuda().requires_grad_()
-loga2 = (torch.randn(3)*oc_sd).cuda().requires_grad_()
-print('initial loga', loga1, loga2)
+loga = (torch.randn(3)*oc_sd).cuda().requires_grad_()
+print('initial loga', loga)
 def hard_concrete(loga, batch_size=128):
     beta, gamma, zeta, eps = 2/3, -0.1, 1.1, 1e-20
     u = torch.rand(batch_size, loga.shape[0], device=loga.device)
@@ -111,16 +76,13 @@ def hard_concrete(loga, batch_size=128):
     z = hard_sigmoid(sbar)
     return z
 
-import inspect
-print(inspect.getsource(m11._forward_impl))
-
 #%%
 best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
 train_accs = []
 val_accs = []
 
 opt = {'epochs':15}
-optimizer = torch.optim.RAdam([loga1, loga2],
+optimizer = torch.optim.RAdam([loga],
                 lr= 0.001,
                 betas=(0.9, 0.999), 
                 eps=1e-8,
@@ -140,23 +102,19 @@ for epoch in range(opt['epochs']):
         inputs = inputs.cuda()
         gt_label = gt_label.cuda()
         optimizer.zero_grad()
-        z1 = hard_concrete(loga1, batch_size=gt_label.shape[0])
-        z2 = hard_concrete(loga2, batch_size=gt_label.shape[0])
-        half0 = m11(inputs).reshape(gt_label.shape[0], 128,7,7)*z1[:,0:1, None, None] 
-            # + m21(inputs).reshape(gt_label.shape[0], 128,7,7)*z1[:,1:2, None, None] 
-            # + m31(inputs).reshape(gt_label.shape[0], 128,7,7)*z1[:,2:3, None, None]
-        # pred0, pred1, pred2 = m12(half0)*z2[:,0:1], m22(half0)*z2[:,1:2], m32(half0)*z2[:,2:3]
-        # l0, l1, l2 = loss_func(pred0, gt_label), loss_func(pred1, gt_label), loss_func(pred2, gt_label)
-        # loss = l0 + l1 + l2 + lamb*(z1.mean() + z2.mean() - 2/3)
-        pred0, pred1 = m22(half0)*z2[:,1:2], m12(half0)*z2[:,0:1]
-        l0 = loss_func(pred0, gt_label) #loss_func(pred0, gt_label)#
-        loss = l0
+        z = hard_concrete(loga, batch_size=gt_label.shape[0])
+        pred0 = t0(inputs)*z[:,0:1]
+        pred1 = t1(inputs)*z[:,1:2]
+        pred2 = t2(inputs)*z[:,2:]
+        l0 = loss_func(pred0, gt_label)
+        l1 = loss_func(pred1, gt_label)
+        l2 = loss_func(pred1, gt_label)
+        loss = l0 + l1 + l2 + lamb*(z.mean() -1/3)
         loss.backward()
         loss_tr.append(loss.cpu().detach().item())
         optimizer.step()
         
-        print("yes")
-        g_ind = z2.argmax(dim=1)
+        g_ind = z.argmax(dim=1)
         pred = torch.stack((pred0, pred1, pred2), dim=1)
         predictions = pred[range(z.shape[0]),g_ind]
         _, predicted_class = predictions.max(1)
@@ -177,10 +135,14 @@ for epoch in range(opt['epochs']):
             inputs = inputs.cuda()
             gt_label = gt_label.cuda()
             z = hard_concrete(loga, batch_size=gt_label.shape[0])
-            half0 = m11(inputs)*z[:,0:1,None,None] + m21(inputs)*z[:,1:2,None,None] + m31(inputs)*z[:,2:3,None,None]
-            pred0, pred1, pred2 = m12(half0)*z[:,3:4], m22(half0)*z[:,4:5], m32(half0)*z[:,5:6]
+            pred0 = t0(inputs)*z[:,0:1]
+            pred1 = t1(inputs)*z[:,1:2]
+            pred2 = t2(inputs)*z[:,2:]
+            l0 = loss_func(pred0, gt_label)
+            l1 = loss_func(pred1, gt_label)
+            l2 = loss_func(pred1, gt_label)
 
-            g_ind = z[:, 3:].argmax(dim=1)
+            g_ind = z.argmax(dim=1)
             pred = torch.stack((pred0, pred1, pred2), dim=1)
             predictions = pred[range(z.shape[0]),g_ind]
             _, predicted_class = predictions.max(1)
