@@ -19,19 +19,20 @@ from torch.utils.data import Dataset, DataLoader
 print('starting date time ', datetime.now())
 
 #%%
+batch_size = 256
 train_loader = torch.utils.data.DataLoader(
     datasets.MNIST('../data', train=True, download=True,
                    transform=transforms.Compose([
                        transforms.ToTensor(),
                        transforms.Normalize((0.1307,), (0.3081,))
                    ])),
-    batch_size=128, shuffle=True)
+    batch_size=batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(
     datasets.MNIST('../data', train=False, transform=transforms.Compose([
                        transforms.ToTensor(),
                        transforms.Normalize((0.1307,), (0.3081,))
                    ])),
-    batch_size=128, shuffle=True)
+    batch_size=batch_size, shuffle=True)
 
 #%%
 id0 = 'resnet18_mnist'
@@ -58,7 +59,7 @@ t1.load_state_dict(temp_dict, strict=False)
 
 temp_dict = t2.state_dict().copy()
 for i, k in enumerate(t0.state_dict().keys()):
-    if i > 60:
+    if i >= 60:
         if k in temp_dict.keys():
             temp_dict[k] = t0.state_dict()[k]
 t2.load_state_dict(temp_dict, strict=False)
@@ -115,7 +116,7 @@ val_accs = []
 
 opt = {'epochs':150}
 optimizer = torch.optim.RAdam([loga],
-                lr= 1e-4,
+                lr= 1e-3,
                 betas=(0.9, 0.999), 
                 eps=1e-8,
                 weight_decay=0)
@@ -184,13 +185,13 @@ for epoch in range(opt['epochs']):
         val_acc = num_correct_val / total_val_examples
         print("Validation accuracy: {}".format(val_acc))
         val_accs.append(val_acc)
-        print('after validation', loga)
+        print('after validation', loga.detach().cpu())
 
     # Finally, save model if the validation accuracy is the best so far
     if val_acc > best_validation_accuracy:
         best_validation_accuracy = val_acc
         print("Validation accuracy improved; saving model.")
-        print(loga)
+        # print(loga.detach().cpu())
         
 
 #%% plot train and val results
