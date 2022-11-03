@@ -64,7 +64,8 @@ def plot_pdf(loga):
     plt.plot(0, cdf_Qs_bar(0), 'o', markersize=s0, color="#ff7f0e")
     plt.grid()
     plt.ylim([0,2.5])
-    plt.legend(['Concrete', 'Streched concrete', 'Hard concrete', 'Hard concrete p(z=0) and p(z=1) '])
+    plt.legend(['Concrete', 'Streched concrete', 'Hard concrete', \
+        'Hard concrete p(z=0) and p(z=1) '],prop={'size': 14})
     plt.savefig('loga_n3.png')
     plt.show()
 
