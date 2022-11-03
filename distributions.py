@@ -19,8 +19,6 @@ from torch.utils.data import Dataset, DataLoader
 print('starting date time ', datetime.now())
 
 
-
-
 #%%
 loga = torch.tensor(0)
 beta, gamma, zeta, eps = torch.tensor([2/3, -0.1, 1.1, 1e-20])
@@ -28,7 +26,39 @@ u = torch.arange(0,1,1e-3)
 s = torch.sigmoid((torch.log(u+eps) - torch.log(1 - u+eps) + loga) / beta)
 sbar = s * (zeta - gamma) + gamma
 z = hard_sigmoid(sbar)
-#%%
-qs = beta*loga.exp()*s**(-beta-1)*(1-s)**(-beta-1)\
-    /(loga.exp()*s**(-beta)+(1-s)**(-beta))**2
-qs_bar = 1/(zeta-gamma).abs()
+
+#%% Concrete pdf and cdf
+def pdf_qs(x):
+    qs = beta*loga.exp()*x**(-beta-1)*(1-x)**(-beta-1)\
+    /(loga.exp()*x**(-beta)+(1-x)**(-beta))**2
+    return qs
+def cdf_Qs(x):
+    Qs = ((x.log()-(1-x).log())*beta-loga).sigmoid()
+    return Qs
+qs = pdf_qs(s)
+Qs = cdf_Qs(s)
+plt.plot(u, qs)
+plt.plot(u, Qs)
+
+#%% Hard concrete pdf and cdf
+def pdf_qs_bar(x):
+    return 1/(zeta-gamma).abs()*pdf_qs((x-gamma)/(zeta-gamma))
+
+def cdf_Qs_bar(x):
+    return cdf_Qs((x-gamma)/(zeta-gamma))
+
+def delta(x):
+    a = x.clone()
+    a[a!=0] = 1
+    a = 1-a
+    return a
+
+qz1 = cdf_Qs_bar(0)*delta(z) + (1-cdf_Qs_bar(1))*delta(z-1) + \
+    (cdf_Qs_bar(1)-cdf_Qs_bar(0))*pdf_qs_bar(z)
+qz = z.clone()
+qz[z==0] = cdf_Qs_bar(0)
+qz[z==1] = (1-cdf_Qs_bar(1))
+idx = torch.logical_or(z==0, z==1)
+qz[~idx] = (cdf_Qs_bar(1)-cdf_Qs_bar(0))*\
+    pdf_qs_bar(z[~idx])
+
