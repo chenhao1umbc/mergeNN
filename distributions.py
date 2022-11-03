@@ -17,7 +17,7 @@ from utils import *
 from torch.utils.data import Dataset, DataLoader
 
 print('starting date time ', datetime.now())
-
+plt.rcParams['figure.dpi'] = 500
 
 #%%
 def plot_pdf(loga):
@@ -64,6 +64,7 @@ def plot_pdf(loga):
     plt.ylim([0,2.5])
     plt.legend(['Concrete', 'Streched concrete', 'Hard concrete', 'Hard concrete p(z=0) and p(z=1) '])
     plt.show()
+    plt.savefig('loga_n3.png')
 
 loga = torch.tensor(-3)
 plot_pdf(loga)
