@@ -53,8 +53,10 @@ def plot_pdf(loga):
     "l0 norm paper fig.2 was wrong as below, since it did not multiply the coeff."
     # qz[~idx] = pdf_qs_bar(z[~idx]) 
 
-    s0 = max((z==0).sum()/z.shape[0]*20, 1)
-    s1 = max((z==1).sum()/z.shape[0]*20, 1)
+    # s0 = max((z==0).sum()/z.shape[0]*20, 1)
+    # s1 = max((z==1).sum()/z.shape[0]*20, 1)
+    s0 = 5
+    s1 = 5
     plt.plot(s, qs, '--', color="#1f77b4") 
     plt.plot(sbar, pdf_qs_bar(sbar), '-.', color="#2ca02c")
     plt.plot(z[~idx], qz[~idx], color="#ff7f0e")
