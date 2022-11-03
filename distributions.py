@@ -65,8 +65,8 @@ def plot_pdf(loga):
     plt.grid()
     plt.ylim([0,2.5])
     plt.legend(['Concrete', 'Streched concrete', 'Hard concrete', 'Hard concrete p(z=0) and p(z=1) '])
-    plt.show()
     plt.savefig('loga_n3.png')
+    plt.show()
 
 loga = torch.tensor(-3)
 plot_pdf(loga)
