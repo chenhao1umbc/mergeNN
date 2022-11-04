@@ -185,6 +185,11 @@ def train(model: nn.Module) -> None:
             total_loss = 0
             start_time = time.time()
 
+            "save models"
+            if batch % (3*log_interval) == 0 and batch >0:
+                with torch.no_grad():
+                    torch.save(model, f'tranf_model_{epoch}_{batch}.pt')
+
 def evaluate(model: nn.Module, eval_data: Tensor) -> float:
     model.eval()  # turn on evaluation mode
     total_loss = 0.
@@ -223,6 +228,9 @@ for epoch in range(1, epochs + 1):
     scheduler.step()
 
 #%%
+with torch.no_grad():
+    torch.save(model, f'tranf_model_best.pt')
+
 test_loss = evaluate(best_model, test_data)
 test_ppl = math.exp(test_loss)
 print('=' * 89)
