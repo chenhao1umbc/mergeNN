@@ -188,7 +188,8 @@ def train(model: nn.Module) -> None:
             "save models"
             if batch % (3*log_interval) == 0 and batch >0:
                 with torch.no_grad():
-                    torch.save(model, f'tranf_model_{epoch}_{batch}.pt')
+                    torch.save(model, f'./data/transformers/tranf_model_{epoch}_{batch}.pt')
+                
 
 def evaluate(model: nn.Module, eval_data: Tensor) -> float:
     model.eval()  # turn on evaluation mode
