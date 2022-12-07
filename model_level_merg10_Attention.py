@@ -2,6 +2,7 @@
 "This code is made to perform model level merge of the pretrained transformers"
 import math
 from typing import Tuple
+from utils import *
 
 import torch
 from torch import nn, Tensor
@@ -149,6 +150,44 @@ import time
 
 criterion = nn.CrossEntropyLoss()
 
+def train(model: nn.Module) -> None:
+    model.train()  # turn on train mode
+    total_loss = 0.
+    log_interval = 200
+    start_time = time.time()
+    src_mask = generate_square_subsequent_mask(bptt).to(device)
+
+    num_batches = len(train_data) // bptt
+    for batch, i in enumerate(range(0, train_data.size(0) - 1, bptt)):
+        data, targets = get_batch(train_data, i)
+        seq_len = data.size(0)
+        if seq_len != bptt:  # only on last batch
+            src_mask = src_mask[:seq_len, :seq_len]
+        output = model(data, src_mask)
+        loss = criterion(output.view(-1, ntokens), targets)
+
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+        optimizer.step()
+
+        total_loss += loss.item()
+        if batch % log_interval == 0 and batch > 0:
+            lr = scheduler.get_last_lr()[0]
+            ms_per_batch = (time.time() - start_time) * 1000 / log_interval
+            cur_loss = total_loss / log_interval
+            ppl = math.exp(cur_loss)
+            print(f'| epoch {epoch:3d} | {batch:5d}/{num_batches:5d} batches | '
+                  f'lr {lr:02.2f} | ms/batch {ms_per_batch:5.2f} | '
+                  f'loss {cur_loss:5.2f} | ppl {ppl:8.2f}')
+            total_loss = 0
+            start_time = time.time()
+
+            "save models"
+            if batch % (3*log_interval) == 0 and batch >0:
+                with torch.no_grad():
+                    torch.save(model, f'./data/transformers/tranf_model_{epoch}_{batch}.pt')
+
 def evaluate(model: nn.Module, eval_data: Tensor) -> float:
     model.eval()  # turn on evaluation mode
     total_loss = 0.
@@ -164,15 +203,8 @@ def evaluate(model: nn.Module, eval_data: Tensor) -> float:
             total_loss += seq_len * criterion(output_flat, targets).item()
     return total_loss / (len(eval_data) - 1)
 
-
-test_loss = evaluate(best_model, test_data)
-test_ppl = math.exp(test_loss)
-print('=' * 89)
-print(f'| End of training | test loss {test_loss:5.2f} | '
-      f'test ppl {test_ppl:8.2f}')
-print('=' * 89)
 #%% evaluate each of the model
-names = [f'tranf_model_{i}_{j}.pt' for i in range(1,4) for j in range(600, 2401, 600)] 
+names = [f'./data/transformers/tranf_model_{i}_{j}.pt' for i in range(1,4) for j in range(600, 2401, 600)] 
 the10 = names[2:]
 res = []
 for name in the10:
@@ -193,3 +225,22 @@ def hard_concrete(loga, batch_size=128):
     z = hard_sigmoid(sbar)
     return z
 
+optimizer = torch.optim.SGD(model.parameters(), lr=5.0)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
+best_val_loss = float('inf')
+epochs = 3
+best_model = None
+for epoch in range(1, epochs + 1):
+    epoch_start_time = time.time()
+    train(model)
+    val_loss = evaluate(model, val_data)
+    val_ppl = math.exp(val_loss)
+    elapsed = time.time() - epoch_start_time
+    print('-' * 89)
+    print(f'| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | '
+          f'valid loss {val_loss:5.2f} | valid ppl {val_ppl:8.2f}')
+    print('-' * 89)
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        best_model = copy.deepcopy(model)
+    scheduler.step()
