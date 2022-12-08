@@ -207,14 +207,20 @@ def evaluate(model: nn.Module, eval_data: Tensor) -> float:
 names = [f'./data/transformers/tranf_model_{i}_{j}.pt' for i in range(1,4) for j in range(600, 2401, 600)] 
 the10 = names[2:]
 res = []
+models = []
 for name in the10:
     model = torch.load(name)
+    model.eval()
+    for param in model.parameters():
+        param.requires_grad_(False)
+    models.append(model)
     test_loss = evaluate(model, test_data)
     test_ppl = math.exp(test_loss)
     res.append(test_ppl)
 
 #%% merging the models
 oc_sd=0.01
+lamb = 1
 loga = (torch.randn(10)*oc_sd).cuda().requires_grad_()
 print('initial loga', loga)
 def hard_concrete(loga, batch_size=128):
@@ -225,22 +231,45 @@ def hard_concrete(loga, batch_size=128):
     z = hard_sigmoid(sbar)
     return z
 
-optimizer = torch.optim.SGD(model.parameters(), lr=5.0)
+optimizer = torch.optim.SGD([loga], lr=1)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
 best_val_loss = float('inf')
-epochs = 3
+epochs = 300
 best_model = None
 for epoch in range(1, epochs + 1):
     epoch_start_time = time.time()
-    train(model)
-    val_loss = evaluate(model, val_data)
-    val_ppl = math.exp(val_loss)
-    elapsed = time.time() - epoch_start_time
-    print('-' * 89)
-    print(f'| end of epoch {epoch:3d} | time: {elapsed:5.2f}s | '
-          f'valid loss {val_loss:5.2f} | valid ppl {val_ppl:8.2f}')
-    print('-' * 89)
-    if val_loss < best_val_loss:
-        best_val_loss = val_loss
-        best_model = copy.deepcopy(model)
-    scheduler.step()
+    total_loss = 0.
+    log_interval = 200
+    start_time = time.time()
+    src_mask = generate_square_subsequent_mask(bptt).to(device)
+
+    num_batches = len(train_data) // bptt
+    for ii, seq in enumerate(range(0, train_data.size(0) - 1, bptt)):
+        data, targets = get_batch(train_data, seq)
+        seq_len = data.size(0)
+        if seq_len != bptt:  # only on last batch
+            src_mask = src_mask[:seq_len, :seq_len]
+        g = hard_concrete(loga, batch_size=targets.shape[0])
+        l = 0
+        for i, model in enumerate(models):
+            output = model(data, src_mask)
+            l = l + criterion(output.view(-1, ntokens)*g[:,i,None], targets)/10
+            
+        loss = l + lamb*(g.mean() -1/10)
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_([loga], 0.5)
+        optimizer.step()
+
+        total_loss += loss.item()
+        if ii % log_interval == 0 and ii > 0:
+            lr = scheduler.get_last_lr()[0]
+            ms_per_batch = (time.time() - start_time) * 1000 / log_interval
+            cur_loss = total_loss / log_interval
+            ppl = math.exp(cur_loss)
+            print(f'| epoch {epoch:3d} | {ii:5d}/{num_batches:5d} batches | '
+                    f'lr {lr:02.2f} | ms/batch {ms_per_batch:5.2f} | '
+                    f'loss {cur_loss:5.2f} | ppl {ppl:8.2f}')
+            print(loga)
+            total_loss = 0
+            start_time = time.time()
