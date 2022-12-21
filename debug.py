@@ -98,7 +98,115 @@ m22 = replace_relu(m22)
 m32 = replace_relu(m32)
 
 #%%
-d = torch.rand(5,1,28,28)
-r1 = t0(d)
-r2 = m22(m11(d.cuda()).reshape(5,128,7,7)).detach().cpu()
-print((r1-r2).abs().sum())
+oc_sd=0.01
+loga = (torch.randn(6)*oc_sd).cuda().requires_grad_()
+print('initial loga', loga)
+def hard_concrete(loga, batch_size=128):
+    beta, gamma, zeta, eps = 2/3, -0.1, 1.1, 1e-20
+    u = torch.rand(batch_size, loga.shape[0], device=loga.device)
+    s = torch.sigmoid((torch.log(u+eps) - torch.log(1 - u+eps) + loga) / beta)
+    sbar = s * (zeta - gamma) + gamma
+    z = hard_sigmoid(sbar)
+    return z
+
+#%%
+best_validation_accuracy = 0. # used to pick the best-performing model on the validation set
+train_accs = []
+val_accs = []
+
+opt = {'epochs':150}
+optimizer = torch.optim.RAdam([loga],
+                lr= 1e-3,
+                betas=(0.9, 0.999), 
+                eps=1e-8,
+                weight_decay=0)
+loss_func = nn.CrossEntropyLoss()
+
+loss_tr, loss_val = [], []
+lamb = 5
+for epoch in range(opt['epochs']):
+    # print training info
+    print(f"### Epoch {epoch}:")
+    total_train_examples = 0
+    num_correct_train = 0
+
+    # for batch_index, (inputs, gt_label) in tqdm(enumerate(train_loader), total=len(train_dataset)//train_batchsize):
+    for batch_index, (inputs, gt_label) in enumerate(train_loader):
+        inputs = inputs.cuda()
+        gt_label = gt_label.cuda()
+        optimizer.zero_grad()
+        z = hard_concrete(loga, batch_size=gt_label.shape[0])
+        half0 = m11(inputs).reshape(gt_label.shape[0], 128,7,7)*z[:,0:1, None, None] \
+            + m21(inputs).reshape(gt_label.shape[0], 128,7,7)*z[:,1:2, None, None] \
+            + m31(inputs).reshape(gt_label.shape[0], 128,7,7)*z[:,2:3, None, None]
+        pred0, pred1, pred2 = m12(half0)*z[:,3:4], m22(half0)*z[:,4:5], m32(half0)*z[:,5:6]
+        l0, l1, l2 = loss_func(pred0, gt_label), loss_func(pred1, gt_label), loss_func(pred2, gt_label)
+        # with torch.no_grad():
+        #     lamb = l0+l1+l2
+        loss = l0 + l1 + l2 + lamb*(z.mean() - 1/3)
+        loss.backward()
+        loss_tr.append(loss.cpu().detach().item())
+        optimizer.step()
+        # if batch_index%10 == 0:
+        #     print("laga", loga)      
+        g_ind = z[:, 3:].argmax(dim=1)
+        pred = torch.stack((pred0, pred1, pred2), dim=1)
+        predictions = pred[range(z.shape[0]),g_ind]
+        _, predicted_class = predictions.max(1)
+        total_train_examples += predicted_class.size(0)
+        num_correct_train += predicted_class.eq(gt_label).sum().item()
+
+    # get results
+    train_acc = num_correct_train / total_train_examples
+    print("Training accuracy: {}".format(train_acc))
+    train_accs.append(train_acc)
+
+    # evaluation
+    total_val_examples = 0
+    num_correct_val = 0
+
+    with torch.no_grad(): # don't save parameter gradients/changes since this is not for model training
+        for batch_index, (inputs, gt_label) in enumerate(test_loader):
+            inputs = inputs.cuda()
+            gt_label = gt_label.cuda()
+            z = hard_concrete(loga, batch_size=gt_label.shape[0])
+            half0 = m11(inputs)*z[:,0:1] + m21(inputs)*z[:,1:2] + m31(inputs)*z[:,2:3]
+            half0r = half0.reshape(gt_label.shape[0],128,7,7)
+            pred0, pred1, pred2 = m12(half0r)*z[:,3:4], m22(half0r)*z[:,4:5], m32(half0r)*z[:,5:6]
+
+            g_ind = z[:, 3:].argmax(dim=1)
+            pred = torch.stack((pred0, pred1, pred2), dim=1)
+            predictions = pred[range(z.shape[0]),g_ind]
+            _, predicted_class = predictions.max(1)
+            total_val_examples += predicted_class.size(0)
+            num_correct_val += predicted_class.eq(gt_label).sum().item()
+
+        # get validation results
+        val_acc = num_correct_val / total_val_examples
+        print("Validation accuracy: {}".format(val_acc))
+        val_accs.append(val_acc)
+        print('after validation', loga.detach().cpu())
+
+    # Finally, save model if the validation accuracy is the best so far
+    if val_acc > best_validation_accuracy:
+        best_validation_accuracy = val_acc
+        print("Validation accuracy improved; saving model.")
+        # print(loga.detach().cpu())
+        
+
+#%% plot train and val results
+epochs_list = list(range(opt['epochs']))
+plt.figure()
+plt.plot(epochs_list, train_accs, '--x', label='training set accuracy')
+plt.plot(epochs_list, val_accs, '-.v', label='validation set accuracy')
+plt.xlabel('epoch')
+plt.ylabel('prediction accuracy')
+# plt.ylim(0.5, 1)
+plt.title('Classifier training evolution:\nprediction accuracy over time')
+plt.legend()
+plt.savefig('train_val.png')
+# plt.savefig(f'train_val{id}.png')
+plt.show()
+
+print('done')
+print('End date time ', datetime.now())
