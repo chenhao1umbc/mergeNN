@@ -9,7 +9,7 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.utils.data import dataset
-
+torch.set_printoptions(linewidth=150)
 class TransformerModel(nn.Module):
 
     def __init__(self, ntoken: int, d_model: int, nhead: int, d_hid: int,
@@ -220,7 +220,7 @@ for name in the10:
 
 #%% merging the models
 oc_sd=0.01
-lamb = 1
+lamb = 5
 loga = (torch.randn(10)*oc_sd).cuda().requires_grad_()
 print('initial loga', loga)
 def hard_concrete(loga, batch_size=128):
@@ -231,10 +231,13 @@ def hard_concrete(loga, batch_size=128):
     z = hard_sigmoid(sbar)
     return z
 
-optimizer = torch.optim.SGD([loga], lr=1)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
+optimizer = torch.optim.RAdam([loga],
+                lr= 1e-3,
+                betas=(0.9, 0.999), 
+                eps=1e-8,
+                weight_decay=0)
 best_val_loss = float('inf')
-epochs = 300
+epochs = 10
 best_model = None
 for epoch in range(1, epochs + 1):
     epoch_start_time = time.time()
@@ -249,11 +252,11 @@ for epoch in range(1, epochs + 1):
         seq_len = data.size(0)
         if seq_len != bptt:  # only on last batch
             src_mask = src_mask[:seq_len, :seq_len]
-        g = hard_concrete(loga, batch_size=targets.shape[0])
+        g = hard_concrete(loga, batch_size=targets.shape[0]) # [1, 10]
         l = 0
         for i, model in enumerate(models):
             output = model(data, src_mask)
-            l = l + criterion(output.view(-1, ntokens)*g[:,i,None], targets)/10
+            l = l + criterion(output.view(-1, ntokens)*g[0,i,None], targets)
             
         loss = l + lamb*(g.mean() -1/10)
         optimizer.zero_grad()
@@ -263,13 +266,7 @@ for epoch in range(1, epochs + 1):
 
         total_loss += loss.item()
         if ii % log_interval == 0 and ii > 0:
-            lr = scheduler.get_last_lr()[0]
-            ms_per_batch = (time.time() - start_time) * 1000 / log_interval
-            cur_loss = total_loss / log_interval
-            ppl = math.exp(cur_loss)
-            print(f'| epoch {epoch:3d} | {ii:5d}/{num_batches:5d} batches | '
-                    f'lr {lr:02.2f} | ms/batch {ms_per_batch:5.2f} | '
-                    f'loss {cur_loss:5.2f} | ppl {ppl:8.2f}')
-            print(loga)
+            print(ii)
+            print(loga.cpu().data, l.cpu().data, lamb*(g.mean() -1/10).cpu().data, loss.cpu().data)
             total_loss = 0
             start_time = time.time()
