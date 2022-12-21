@@ -140,10 +140,8 @@ for epoch in range(opt['epochs']):
             + m21(inputs).reshape(gt_label.shape[0], 128,7,7)*z[:,1:2, None, None] \
             + m31(inputs).reshape(gt_label.shape[0], 128,7,7)*z[:,2:3, None, None]
         pred0, pred1, pred2 = m12(half0)*z[:,3:4], m22(half0)*z[:,4:5], m32(half0)*z[:,5:6]
-        l0, l1, l2 = loss_func(pred0, gt_label), loss_func(pred1, gt_label), loss_func(pred2, gt_label)
-        # with torch.no_grad():
-        #     lamb = l0+l1+l2
-        loss = l0 + l1 + l2 + lamb*(z.mean() - 1/3)
+        l = loss_func(pred0+pred1+pred2, gt_label)
+        loss = l + lamb*(z.mean() - 1/3)
         loss.backward()
         loss_tr.append(loss.cpu().detach().item())
         optimizer.step()
