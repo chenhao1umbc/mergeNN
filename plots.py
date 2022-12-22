@@ -15,7 +15,7 @@ from datetime import datetime
 from modules import *
 from utils import *
 from torch.utils.data import Dataset, DataLoader
-
+plt.rcParams['figure.dpi'] = 150
 print('starting date time ', datetime.now())
 
 #%% plot pdf
@@ -74,7 +74,7 @@ loga = torch.tensor(-3)
 plot_pdf(loga)
 
 #%%
-file1 = open('./modulelevel3_log.txt', 'r')
+file1 = open('./modulelevel3_log.out', 'r')
 lines = file1.readlines()
 start = len('after validation tensor(')
 res = {i:[] for i in range(6)}
@@ -84,15 +84,15 @@ for ii, line in enumerate(lines):
         exec('a='+data[:-1])
         for i in range(6):
             res[i].append(a[i])
-plt.rcParams['figure.dpi'] = 500
 
-plt.figure()
+plt.figure(figsize=(4,3), dpi=300)
 marker = ['-x', '-o', '-^', '-d', '-v', '->']
 for i in range(6):
     plt.plot(res[i], marker[i], markevery=20)
-plt.legend([f'log alpha_{i}' for i in range(1,7)])
-plt.xlabel('Epoch')
-plt.ylabel('Value')
+plt.legend([f'log alpha_{i}' for i in range(1,7)],fontsize=10)
+plt.xlabel('Epoch',fontsize=12)
+plt.ylabel('Value',fontsize=12)
+plt.tight_layout() # otherwise the text will be chopped off
 plt.savefig('module_loga.png')
 
 #%%

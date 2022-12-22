@@ -194,17 +194,37 @@ for epoch in range(opt['epochs']):
 
 #%% plot train and val results
 epochs_list = list(range(opt['epochs']))
-plt.figure()
-plt.plot(epochs_list, train_accs, '--x', label='training set accuracy')
-plt.plot(epochs_list, val_accs, '-.v', label='validation set accuracy')
-plt.xlabel('epoch')
-plt.ylabel('prediction accuracy')
-# plt.ylim(0.5, 1)
-plt.title('Classifier training evolution:\nprediction accuracy over time')
-plt.legend()
+plt.figure(figsize=(4,3), dpi=300)
+plt.plot(epochs_list, train_accs, '--x', markevery=10)
+plt.plot(epochs_list, val_accs, '-.v', markevery=15)
+plt.legend(['training set accuracy', 'validation set accuracy'],fontsize=12)
+plt.xlabel('epoch',fontsize=12)
+plt.ylabel('prediction accuracy',fontsize=12)
+plt.tight_layout()
 plt.savefig('train_val.png')
-# plt.savefig(f'train_val{id}.png')
 plt.show()
 
 print('done')
 print('End date time ', datetime.now())
+
+#%%
+file1 = open('./modulelevel3_log.out', 'r')
+lines = file1.readlines()
+start = len('after validation tensor(')
+res = {i:[] for i in range(6)}
+for ii, line in enumerate(lines):
+    if line[:start] == 'after validation tensor(':
+        data = line[start:].strip()
+        exec('a='+data[:-1])
+        for i in range(6):
+            res[i].append(a[i])
+
+plt.figure(figsize=(4,3), dpi=300)
+marker = ['-x', '-o', '-^', '-d', '-v', '->']
+for i in range(6):
+    plt.plot(res[i], marker[i], markevery=20)
+plt.legend([f'log alpha_{i}' for i in range(1,7)],fontsize=10)
+plt.xlabel('Epoch',fontsize=12)
+plt.ylabel('Value',fontsize=12)
+plt.tight_layout() # otherwise the text will be chopped off
+plt.savefig('module_loga.png')

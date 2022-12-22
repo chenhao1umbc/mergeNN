@@ -1,0 +1,674 @@
+done loading
+done loading
+starting date time  2022-12-21 21:51:11.032058
+Using cache found in /home/chenhao1/.cache/torch/hub/pytorch_vision_v0.10.0
+/home/chenhao1/.miniconda3/lib/python3.8/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+/home/chenhao1/.miniconda3/lib/python3.8/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+Using cache found in /home/chenhao1/.cache/torch/hub/pytorch_vision_v0.10.0
+Using cache found in /home/chenhao1/.cache/torch/hub/pytorch_vision_v0.10.0
+Using cache found in /home/chenhao1/.cache/torch/hub/pytorch_vision_v0.10.0
+initial loga tensor([ 0.0092, -0.0077,  0.0063,  0.0117,  0.0129, -0.0124], device='cuda:0',
+       requires_grad=True)
+### Epoch 0:
+Training accuracy: 0.17626666666666665
+Validation accuracy: 0.1872
+after validation tensor([ 0.0622, -0.0583, -0.0456, -0.0404,  0.0654, -0.0646])
+Validation accuracy improved; saving model.
+### Epoch 1:
+Training accuracy: 0.19455
+Validation accuracy: 0.2058
+after validation tensor([ 0.1555, -0.1529, -0.1372, -0.1348,  0.1553, -0.1585])
+Validation accuracy improved; saving model.
+### Epoch 2:
+Training accuracy: 0.2212
+Validation accuracy: 0.2324
+after validation tensor([ 0.2698, -0.2717, -0.2573, -0.2528,  0.2643, -0.2769])
+Validation accuracy improved; saving model.
+### Epoch 3:
+Training accuracy: 0.2532
+Validation accuracy: 0.267
+after validation tensor([ 0.3774, -0.4107, -0.3955, -0.3884,  0.3916, -0.4122])
+Validation accuracy improved; saving model.
+### Epoch 4:
+Training accuracy: 0.29051666666666665
+Validation accuracy: 0.3181
+after validation tensor([ 0.5050, -0.5684, -0.5515, -0.5360,  0.5265, -0.5607])
+Validation accuracy improved; saving model.
+### Epoch 5:
+Training accuracy: 0.33371666666666666
+Validation accuracy: 0.3581
+after validation tensor([ 0.6467, -0.7410, -0.7168, -0.6920,  0.6685, -0.7179])
+Validation accuracy improved; saving model.
+### Epoch 6:
+Training accuracy: 0.3902
+Validation accuracy: 0.409
+after validation tensor([ 0.8004, -0.9217, -0.8929, -0.8536,  0.8086, -0.8797])
+Validation accuracy improved; saving model.
+### Epoch 7:
+Training accuracy: 0.43646666666666667
+Validation accuracy: 0.4689
+after validation tensor([ 0.9626, -1.1098, -1.0726, -1.0204,  0.9539, -1.0467])
+Validation accuracy improved; saving model.
+### Epoch 8:
+Training accuracy: 0.48856666666666665
+Validation accuracy: 0.516
+after validation tensor([ 1.1286, -1.2981, -1.2555, -1.1882,  1.0997, -1.2125])
+Validation accuracy improved; saving model.
+### Epoch 9:
+Training accuracy: 0.5386666666666666
+Validation accuracy: 0.5591
+after validation tensor([ 1.2912, -1.4870, -1.4362, -1.3537,  1.2449, -1.3781])
+Validation accuracy improved; saving model.
+### Epoch 10:
+Training accuracy: 0.5878833333333333
+Validation accuracy: 0.614
+after validation tensor([ 1.4544, -1.6764, -1.6159, -1.5193,  1.3888, -1.5421])
+Validation accuracy improved; saving model.
+### Epoch 11:
+Training accuracy: 0.6319
+Validation accuracy: 0.6528
+after validation tensor([ 1.6185, -1.8668, -1.7941, -1.6825,  1.5288, -1.7030])
+Validation accuracy improved; saving model.
+### Epoch 12:
+Training accuracy: 0.6737666666666666
+Validation accuracy: 0.6967
+after validation tensor([ 1.7737, -2.0458, -1.9677, -1.8425,  1.6615, -1.8605])
+Validation accuracy improved; saving model.
+### Epoch 13:
+Training accuracy: 0.7111166666666666
+Validation accuracy: 0.737
+after validation tensor([ 1.9275, -2.2201, -2.1385, -1.9965,  1.8034, -2.0157])
+Validation accuracy improved; saving model.
+### Epoch 14:
+Training accuracy: 0.74475
+Validation accuracy: 0.7664
+after validation tensor([ 2.0755, -2.3975, -2.2963, -2.1491,  1.9306, -2.1671])
+Validation accuracy improved; saving model.
+### Epoch 15:
+Training accuracy: 0.775
+Validation accuracy: 0.7838
+after validation tensor([ 2.2193, -2.5637, -2.4541, -2.2966,  2.0575, -2.3142])
+Validation accuracy improved; saving model.
+### Epoch 16:
+Training accuracy: 0.8026166666666666
+Validation accuracy: 0.8073
+after validation tensor([ 2.3570, -2.7255, -2.6103, -2.4423,  2.1770, -2.4574])
+Validation accuracy improved; saving model.
+### Epoch 17:
+Training accuracy: 0.8217833333333333
+Validation accuracy: 0.8301
+after validation tensor([ 2.4928, -2.8796, -2.7623, -2.5828,  2.2945, -2.5968])
+Validation accuracy improved; saving model.
+### Epoch 18:
+Training accuracy: 0.8419166666666666
+Validation accuracy: 0.8523
+after validation tensor([ 2.6241, -3.0319, -2.9130, -2.7201,  2.4164, -2.7322])
+Validation accuracy improved; saving model.
+### Epoch 19:
+Training accuracy: 0.8577333333333333
+Validation accuracy: 0.8663
+after validation tensor([ 2.7507, -3.1806, -3.0499, -2.8528,  2.5270, -2.8628])
+Validation accuracy improved; saving model.
+### Epoch 20:
+Training accuracy: 0.8738333333333334
+Validation accuracy: 0.8854
+after validation tensor([ 2.8745, -3.3331, -3.1927, -2.9843,  2.6404, -2.9926])
+Validation accuracy improved; saving model.
+### Epoch 21:
+Training accuracy: 0.8837666666666667
+Validation accuracy: 0.8879
+after validation tensor([ 2.9947, -3.4797, -3.3362, -3.1121,  2.7569, -3.1171])
+Validation accuracy improved; saving model.
+### Epoch 22:
+Training accuracy: 0.8973666666666666
+Validation accuracy: 0.9012
+after validation tensor([ 3.1115, -3.6203, -3.4695, -3.2371,  2.8689, -3.2407])
+Validation accuracy improved; saving model.
+### Epoch 23:
+Training accuracy: 0.9059666666666667
+Validation accuracy: 0.9119
+after validation tensor([ 3.2296, -3.7524, -3.6069, -3.3617,  2.9761, -3.3620])
+Validation accuracy improved; saving model.
+### Epoch 24:
+Training accuracy: 0.9155
+Validation accuracy: 0.9186
+after validation tensor([ 3.3424, -3.8853, -3.7428, -3.4837,  3.0836, -3.4821])
+Validation accuracy improved; saving model.
+### Epoch 25:
+Training accuracy: 0.9227833333333333
+Validation accuracy: 0.9273
+after validation tensor([ 3.4563, -4.0168, -3.8677, -3.6021,  3.1815, -3.5970])
+Validation accuracy improved; saving model.
+### Epoch 26:
+Training accuracy: 0.9307
+Validation accuracy: 0.9357
+after validation tensor([ 3.5665, -4.1410, -3.9925, -3.7186,  3.2855, -3.7107])
+Validation accuracy improved; saving model.
+### Epoch 27:
+Training accuracy: 0.93625
+Validation accuracy: 0.9384
+after validation tensor([ 3.6753, -4.2622, -4.1108, -3.8343,  3.3807, -3.8220])
+Validation accuracy improved; saving model.
+### Epoch 28:
+Training accuracy: 0.9394666666666667
+Validation accuracy: 0.9436
+after validation tensor([ 3.7816, -4.3879, -4.2369, -3.9481,  3.4868, -3.9334])
+Validation accuracy improved; saving model.
+### Epoch 29:
+Training accuracy: 0.9460833333333334
+Validation accuracy: 0.947
+after validation tensor([ 3.8924, -4.5068, -4.3587, -4.0609,  3.5965, -4.0427])
+Validation accuracy improved; saving model.
+### Epoch 30:
+Training accuracy: 0.9478666666666666
+Validation accuracy: 0.9481
+after validation tensor([ 3.9938, -4.6251, -4.4837, -4.1720,  3.6987, -4.1503])
+Validation accuracy improved; saving model.
+### Epoch 31:
+Training accuracy: 0.9522666666666667
+Validation accuracy: 0.9534
+after validation tensor([ 4.1016, -4.7329, -4.5949, -4.2824,  3.7997, -4.2586])
+Validation accuracy improved; saving model.
+### Epoch 32:
+Training accuracy: 0.9556333333333333
+Validation accuracy: 0.9561
+after validation tensor([ 4.2126, -4.8417, -4.6955, -4.3900,  3.8887, -4.3670])
+Validation accuracy improved; saving model.
+### Epoch 33:
+Training accuracy: 0.9580166666666666
+Validation accuracy: 0.9598
+after validation tensor([ 4.3207, -4.9551, -4.8158, -4.4954,  3.9925, -4.4752])
+Validation accuracy improved; saving model.
+### Epoch 34:
+Training accuracy: 0.9602833333333334
+Validation accuracy: 0.9631
+after validation tensor([ 4.4212, -5.0666, -4.9263, -4.6014,  4.0847, -4.5824])
+Validation accuracy improved; saving model.
+### Epoch 35:
+Training accuracy: 0.9638333333333333
+Validation accuracy: 0.9649
+after validation tensor([ 4.5168, -5.1650, -5.0311, -4.7054,  4.1719, -4.6840])
+Validation accuracy improved; saving model.
+### Epoch 36:
+Training accuracy: 0.9652
+Validation accuracy: 0.9645
+after validation tensor([ 4.6158, -5.2763, -5.1340, -4.8065,  4.2528, -4.7858])
+### Epoch 37:
+Training accuracy: 0.9670166666666666
+Validation accuracy: 0.9664
+after validation tensor([ 4.7117, -5.3875, -5.2386, -4.9077,  4.3374, -4.8899])
+Validation accuracy improved; saving model.
+### Epoch 38:
+Training accuracy: 0.9680166666666666
+Validation accuracy: 0.9703
+after validation tensor([ 4.8178, -5.4861, -5.3483, -5.0116,  4.4187, -4.9891])
+Validation accuracy improved; saving model.
+### Epoch 39:
+Training accuracy: 0.9688833333333333
+Validation accuracy: 0.9705
+after validation tensor([ 4.9140, -5.5833, -5.4472, -5.1170,  4.5102, -5.0896])
+Validation accuracy improved; saving model.
+### Epoch 40:
+Training accuracy: 0.9714166666666667
+Validation accuracy: 0.9705
+after validation tensor([ 5.0117, -5.6809, -5.5360, -5.2207,  4.5939, -5.1888])
+### Epoch 41:
+Training accuracy: 0.9728666666666667
+Validation accuracy: 0.9723
+after validation tensor([ 5.1059, -5.7742, -5.6289, -5.3260,  4.6727, -5.2927])
+Validation accuracy improved; saving model.
+### Epoch 42:
+Training accuracy: 0.9735
+Validation accuracy: 0.9738
+after validation tensor([ 5.1918, -5.8773, -5.7200, -5.4233,  4.7580, -5.3904])
+Validation accuracy improved; saving model.
+### Epoch 43:
+Training accuracy: 0.9743
+Validation accuracy: 0.9733
+after validation tensor([ 5.2791, -5.9724, -5.8099, -5.5201,  4.8458, -5.4852])
+### Epoch 44:
+Training accuracy: 0.9754833333333334
+Validation accuracy: 0.9753
+after validation tensor([ 5.3677, -6.0517, -5.8982, -5.6244,  4.9306, -5.5830])
+Validation accuracy improved; saving model.
+### Epoch 45:
+Training accuracy: 0.9755
+Validation accuracy: 0.974
+after validation tensor([ 5.4547, -6.1294, -5.9936, -5.7220,  4.9982, -5.6845])
+### Epoch 46:
+Training accuracy: 0.9768333333333333
+Validation accuracy: 0.9761
+after validation tensor([ 5.5330, -6.2069, -6.0792, -5.8183,  5.0803, -5.7848])
+Validation accuracy improved; saving model.
+### Epoch 47:
+Training accuracy: 0.9779
+Validation accuracy: 0.9778
+after validation tensor([ 5.6155, -6.2768, -6.1769, -5.9198,  5.1486, -5.8781])
+Validation accuracy improved; saving model.
+### Epoch 48:
+Training accuracy: 0.9789833333333333
+Validation accuracy: 0.976
+after validation tensor([ 5.6964, -6.3672, -6.2615, -6.0140,  5.2345, -5.9700])
+### Epoch 49:
+Training accuracy: 0.9778666666666667
+Validation accuracy: 0.9778
+after validation tensor([ 5.7840, -6.4622, -6.3585, -6.1089,  5.3095, -6.0650])
+### Epoch 50:
+Training accuracy: 0.9787166666666667
+Validation accuracy: 0.9792
+after validation tensor([ 5.8560, -6.5427, -6.4380, -6.2096,  5.3630, -6.1589])
+Validation accuracy improved; saving model.
+### Epoch 51:
+Training accuracy: 0.9794
+Validation accuracy: 0.9783
+after validation tensor([ 5.9410, -6.6345, -6.5264, -6.2960,  5.4363, -6.2579])
+### Epoch 52:
+Training accuracy: 0.9795333333333334
+Validation accuracy: 0.9793
+after validation tensor([ 6.0091, -6.7183, -6.6089, -6.3856,  5.4947, -6.3524])
+Validation accuracy improved; saving model.
+### Epoch 53:
+Training accuracy: 0.9792666666666666
+Validation accuracy: 0.9772
+after validation tensor([ 6.0970, -6.7923, -6.6902, -6.4795,  5.5319, -6.4524])
+### Epoch 54:
+Training accuracy: 0.97945
+Validation accuracy: 0.9792
+after validation tensor([ 6.1749, -6.8536, -6.7563, -6.5722,  5.6009, -6.5474])
+### Epoch 55:
+Training accuracy: 0.98015
+Validation accuracy: 0.9802
+after validation tensor([ 6.2647, -6.9306, -6.8408, -6.6599,  5.6589, -6.6453])
+Validation accuracy improved; saving model.
+### Epoch 56:
+Training accuracy: 0.9803333333333333
+Validation accuracy: 0.9807
+after validation tensor([ 6.3225, -7.0077, -6.9263, -6.7415,  5.7011, -6.7328])
+Validation accuracy improved; saving model.
+### Epoch 57:
+Training accuracy: 0.9809
+Validation accuracy: 0.9808
+after validation tensor([ 6.3829, -7.0811, -6.9990, -6.8310,  5.7756, -6.8269])
+Validation accuracy improved; saving model.
+### Epoch 58:
+Training accuracy: 0.9810333333333333
+Validation accuracy: 0.9813
+after validation tensor([ 6.4572, -7.1497, -7.0614, -6.9261,  5.8393, -6.9100])
+Validation accuracy improved; saving model.
+### Epoch 59:
+Training accuracy: 0.9817166666666667
+Validation accuracy: 0.9805
+after validation tensor([ 6.5132, -7.2078, -7.1200, -7.0151,  5.9056, -7.0060])
+### Epoch 60:
+Training accuracy: 0.9815333333333334
+Validation accuracy: 0.9806
+after validation tensor([ 6.5662, -7.2846, -7.1920, -7.1023,  5.9731, -7.0871])
+### Epoch 61:
+Training accuracy: 0.9819666666666667
+Validation accuracy: 0.9817
+after validation tensor([ 6.6249, -7.3456, -7.2587, -7.2076,  6.0317, -7.1807])
+Validation accuracy improved; saving model.
+### Epoch 62:
+Training accuracy: 0.9821
+Validation accuracy: 0.9805
+after validation tensor([ 6.6696, -7.4244, -7.3012, -7.3021,  6.0872, -7.2691])
+### Epoch 63:
+Training accuracy: 0.9816666666666667
+Validation accuracy: 0.981
+after validation tensor([ 6.7413, -7.4960, -7.3848, -7.3967,  6.1468, -7.3509])
+### Epoch 64:
+Training accuracy: 0.9820166666666666
+Validation accuracy: 0.9799
+after validation tensor([ 6.7856, -7.5633, -7.4650, -7.4854,  6.2119, -7.4489])
+### Epoch 65:
+Training accuracy: 0.9819333333333333
+Validation accuracy: 0.9809
+after validation tensor([ 6.8588, -7.6132, -7.5098, -7.5649,  6.2692, -7.5343])
+### Epoch 66:
+Training accuracy: 0.9828333333333333
+Validation accuracy: 0.9812
+after validation tensor([ 6.8935, -7.6757, -7.5933, -7.6422,  6.3208, -7.6080])
+### Epoch 67:
+Training accuracy: 0.982
+Validation accuracy: 0.9804
+after validation tensor([ 6.9701, -7.7294, -7.6536, -7.7283,  6.3814, -7.6891])
+### Epoch 68:
+Training accuracy: 0.9822666666666666
+Validation accuracy: 0.9814
+after validation tensor([ 7.0291, -7.7868, -7.7124, -7.8141,  6.4240, -7.7622])
+### Epoch 69:
+Training accuracy: 0.98235
+Validation accuracy: 0.9814
+after validation tensor([ 7.0802, -7.8195, -7.7683, -7.8983,  6.4809, -7.8575])
+### Epoch 70:
+Training accuracy: 0.98235
+Validation accuracy: 0.982
+after validation tensor([ 7.1366, -7.8862, -7.8249, -7.9836,  6.5434, -7.9316])
+Validation accuracy improved; saving model.
+### Epoch 71:
+Training accuracy: 0.9825833333333334
+Validation accuracy: 0.9824
+after validation tensor([ 7.1941, -7.9168, -7.8768, -8.0553,  6.6069, -8.0093])
+Validation accuracy improved; saving model.
+### Epoch 72:
+Training accuracy: 0.9827333333333333
+Validation accuracy: 0.9815
+after validation tensor([ 7.2545, -7.9803, -7.9328, -8.1383,  6.6556, -8.0975])
+### Epoch 73:
+Training accuracy: 0.9832
+Validation accuracy: 0.9808
+after validation tensor([ 7.3089, -8.0243, -7.9912, -8.2222,  6.7047, -8.1642])
+### Epoch 74:
+Training accuracy: 0.9832333333333333
+Validation accuracy: 0.9819
+after validation tensor([ 7.3472, -8.0485, -8.0471, -8.3170,  6.7832, -8.2550])
+### Epoch 75:
+Training accuracy: 0.98285
+Validation accuracy: 0.9817
+after validation tensor([ 7.3956, -8.0870, -8.1159, -8.4054,  6.8290, -8.3296])
+### Epoch 76:
+Training accuracy: 0.9832166666666666
+Validation accuracy: 0.9822
+after validation tensor([ 7.4539, -8.1293, -8.1697, -8.4698,  6.8578, -8.4002])
+### Epoch 77:
+Training accuracy: 0.9834
+Validation accuracy: 0.9811
+after validation tensor([ 7.4811, -8.1635, -8.2007, -8.5350,  6.8963, -8.4713])
+### Epoch 78:
+Training accuracy: 0.9830166666666666
+Validation accuracy: 0.9826
+after validation tensor([ 7.5240, -8.2210, -8.2605, -8.6085,  6.9317, -8.5340])
+Validation accuracy improved; saving model.
+### Epoch 79:
+Training accuracy: 0.9831666666666666
+Validation accuracy: 0.9825
+after validation tensor([ 7.5485, -8.2710, -8.3133, -8.6953,  6.9766, -8.6058])
+### Epoch 80:
+Training accuracy: 0.9832833333333333
+Validation accuracy: 0.9825
+after validation tensor([ 7.5845, -8.3251, -8.3476, -8.7525,  7.0095, -8.6751])
+### Epoch 81:
+Training accuracy: 0.9832333333333333
+Validation accuracy: 0.9821
+after validation tensor([ 7.6304, -8.3698, -8.3939, -8.8214,  7.0710, -8.7416])
+### Epoch 82:
+Training accuracy: 0.983
+Validation accuracy: 0.9828
+after validation tensor([ 7.6919, -8.4205, -8.4398, -8.8873,  7.1065, -8.8079])
+Validation accuracy improved; saving model.
+### Epoch 83:
+Training accuracy: 0.98295
+Validation accuracy: 0.9819
+after validation tensor([ 7.7344, -8.4589, -8.4921, -8.9406,  7.1310, -8.8826])
+### Epoch 84:
+Training accuracy: 0.9828166666666667
+Validation accuracy: 0.9827
+after validation tensor([ 7.7858, -8.5100, -8.5209, -9.0027,  7.1743, -8.9430])
+### Epoch 85:
+Training accuracy: 0.9834166666666667
+Validation accuracy: 0.9826
+after validation tensor([ 7.8266, -8.5547, -8.5442, -9.0586,  7.2235, -8.9933])
+### Epoch 86:
+Training accuracy: 0.98355
+Validation accuracy: 0.9829
+after validation tensor([ 7.8720, -8.6146, -8.5932, -9.1130,  7.2658, -9.0429])
+Validation accuracy improved; saving model.
+### Epoch 87:
+Training accuracy: 0.98355
+Validation accuracy: 0.9826
+after validation tensor([ 7.8955, -8.6499, -8.6512, -9.1730,  7.2964, -9.1057])
+### Epoch 88:
+Training accuracy: 0.9831166666666666
+Validation accuracy: 0.9832
+after validation tensor([ 7.9277, -8.7000, -8.7020, -9.2332,  7.3262, -9.1543])
+Validation accuracy improved; saving model.
+### Epoch 89:
+Training accuracy: 0.9836
+Validation accuracy: 0.9825
+after validation tensor([ 7.9556, -8.7369, -8.7443, -9.3066,  7.3659, -9.2087])
+### Epoch 90:
+Training accuracy: 0.9834333333333334
+Validation accuracy: 0.9823
+after validation tensor([ 8.0071, -8.7975, -8.7772, -9.3733,  7.3909, -9.2566])
+### Epoch 91:
+Training accuracy: 0.9836833333333334
+Validation accuracy: 0.9828
+after validation tensor([ 8.0310, -8.8325, -8.8139, -9.4170,  7.4188, -9.3271])
+### Epoch 92:
+Training accuracy: 0.9834
+Validation accuracy: 0.982
+after validation tensor([ 8.0631, -8.8771, -8.8511, -9.4640,  7.4419, -9.3914])
+### Epoch 93:
+Training accuracy: 0.9835833333333334
+Validation accuracy: 0.983
+after validation tensor([ 8.0934, -8.9152, -8.9038, -9.5146,  7.4853, -9.4410])
+### Epoch 94:
+Training accuracy: 0.9841333333333333
+Validation accuracy: 0.9834
+after validation tensor([ 8.1108, -8.9391, -8.9402, -9.5546,  7.4941, -9.4859])
+Validation accuracy improved; saving model.
+### Epoch 95:
+Training accuracy: 0.9834
+Validation accuracy: 0.9823
+after validation tensor([ 8.1229, -8.9684, -8.9674, -9.6132,  7.5522, -9.5364])
+### Epoch 96:
+Training accuracy: 0.9836833333333334
+Validation accuracy: 0.9814
+after validation tensor([ 8.1491, -9.0040, -8.9967, -9.6707,  7.5946, -9.5670])
+### Epoch 97:
+Training accuracy: 0.9837833333333333
+Validation accuracy: 0.9823
+after validation tensor([ 8.1648, -9.0273, -9.0343, -9.7296,  7.6164, -9.6176])
+### Epoch 98:
+Training accuracy: 0.9835333333333334
+Validation accuracy: 0.9825
+after validation tensor([ 8.2077, -9.0832, -9.0751, -9.7439,  7.6373, -9.6808])
+### Epoch 99:
+Training accuracy: 0.9835833333333334
+Validation accuracy: 0.9834
+after validation tensor([ 8.2285, -9.1276, -9.1065, -9.8066,  7.6679, -9.7339])
+### Epoch 100:
+Training accuracy: 0.9838666666666667
+Validation accuracy: 0.9817
+after validation tensor([ 8.2709, -9.1530, -9.1317, -9.8496,  7.6853, -9.8033])
+### Epoch 101:
+Training accuracy: 0.9836833333333334
+Validation accuracy: 0.9828
+after validation tensor([ 8.2952, -9.1751, -9.1580, -9.8813,  7.7031, -9.8358])
+### Epoch 102:
+Training accuracy: 0.9835
+Validation accuracy: 0.9821
+after validation tensor([ 8.3208, -9.2024, -9.1911, -9.9357,  7.7344, -9.8984])
+### Epoch 103:
+Training accuracy: 0.98355
+Validation accuracy: 0.9831
+after validation tensor([ 8.3349, -9.2198, -9.2224, -9.9745,  7.7684, -9.9331])
+### Epoch 104:
+Training accuracy: 0.9837833333333333
+Validation accuracy: 0.982
+after validation tensor([  8.3719,  -9.2899,  -9.2590, -10.0249,   7.8082,  -9.9591])
+### Epoch 105:
+Training accuracy: 0.9835666666666667
+Validation accuracy: 0.9823
+after validation tensor([  8.4063,  -9.3258,  -9.2889, -10.0627,   7.8197, -10.0154])
+### Epoch 106:
+Training accuracy: 0.9839666666666667
+Validation accuracy: 0.9826
+after validation tensor([  8.4259,  -9.3499,  -9.3135, -10.0903,   7.8460, -10.0577])
+### Epoch 107:
+Training accuracy: 0.9836666666666667
+Validation accuracy: 0.9831
+after validation tensor([  8.4352,  -9.3623,  -9.3488, -10.1262,   7.8671, -10.1140])
+### Epoch 108:
+Training accuracy: 0.9836
+Validation accuracy: 0.9821
+after validation tensor([  8.4477,  -9.3929,  -9.3759, -10.1587,   7.9079, -10.1632])
+### Epoch 109:
+Training accuracy: 0.9834833333333334
+Validation accuracy: 0.9829
+after validation tensor([  8.4833,  -9.4089,  -9.4007, -10.2018,   7.9420, -10.2010])
+### Epoch 110:
+Training accuracy: 0.9839333333333333
+Validation accuracy: 0.983
+after validation tensor([  8.5412,  -9.4430,  -9.4293, -10.2486,   7.9513, -10.2361])
+### Epoch 111:
+Training accuracy: 0.9841666666666666
+Validation accuracy: 0.9828
+after validation tensor([  8.5589,  -9.4758,  -9.4728, -10.2729,   7.9693, -10.2893])
+### Epoch 112:
+Training accuracy: 0.9840333333333333
+Validation accuracy: 0.982
+after validation tensor([  8.5883,  -9.5111,  -9.5157, -10.3392,   8.0138, -10.3379])
+### Epoch 113:
+Training accuracy: 0.9836166666666667
+Validation accuracy: 0.9828
+after validation tensor([  8.6312,  -9.5232,  -9.5538, -10.3731,   8.0291, -10.3629])
+### Epoch 114:
+Training accuracy: 0.9835166666666667
+Validation accuracy: 0.9825
+after validation tensor([  8.6631,  -9.5417,  -9.5736, -10.3960,   8.0460, -10.3940])
+### Epoch 115:
+Training accuracy: 0.98395
+Validation accuracy: 0.9826
+after validation tensor([  8.6895,  -9.5616,  -9.6094, -10.4243,   8.0961, -10.4286])
+### Epoch 116:
+Training accuracy: 0.9841166666666666
+Validation accuracy: 0.983
+after validation tensor([  8.7101,  -9.5858,  -9.6299, -10.4500,   8.1328, -10.4724])
+### Epoch 117:
+Training accuracy: 0.9834
+Validation accuracy: 0.9822
+after validation tensor([  8.7593,  -9.6091,  -9.6778, -10.4977,   8.1603, -10.5013])
+### Epoch 118:
+Training accuracy: 0.9839333333333333
+Validation accuracy: 0.9817
+after validation tensor([  8.7645,  -9.6241,  -9.6902, -10.5334,   8.1955, -10.5464])
+### Epoch 119:
+Training accuracy: 0.98365
+Validation accuracy: 0.9834
+after validation tensor([  8.7998,  -9.6540,  -9.7071, -10.5593,   8.2195, -10.5830])
+### Epoch 120:
+Training accuracy: 0.9836833333333334
+Validation accuracy: 0.9826
+after validation tensor([  8.8462,  -9.6686,  -9.7177, -10.5701,   8.2291, -10.6364])
+### Epoch 121:
+Training accuracy: 0.9841166666666666
+Validation accuracy: 0.9838
+after validation tensor([  8.8539,  -9.6970,  -9.7754, -10.6025,   8.2512, -10.6835])
+Validation accuracy improved; saving model.
+### Epoch 122:
+Training accuracy: 0.98385
+Validation accuracy: 0.9835
+after validation tensor([  8.8636,  -9.7267,  -9.8144, -10.6258,   8.2783, -10.7243])
+### Epoch 123:
+Training accuracy: 0.9835333333333334
+Validation accuracy: 0.9828
+after validation tensor([  8.8997,  -9.7749,  -9.8534, -10.6592,   8.3003, -10.7623])
+### Epoch 124:
+Training accuracy: 0.9842666666666666
+Validation accuracy: 0.9821
+after validation tensor([  8.9176,  -9.7963,  -9.8580, -10.6906,   8.3234, -10.7862])
+### Epoch 125:
+Training accuracy: 0.9841333333333333
+Validation accuracy: 0.9826
+after validation tensor([  8.9447,  -9.8144,  -9.8765, -10.7073,   8.3569, -10.8326])
+### Epoch 126:
+Training accuracy: 0.9836833333333334
+Validation accuracy: 0.9829
+after validation tensor([  8.9696,  -9.8170,  -9.8814, -10.7470,   8.3879, -10.8523])
+### Epoch 127:
+Training accuracy: 0.9841166666666666
+Validation accuracy: 0.9827
+after validation tensor([  8.9847,  -9.8250,  -9.8874, -10.7973,   8.4239, -10.8798])
+### Epoch 128:
+Training accuracy: 0.9838
+Validation accuracy: 0.9829
+after validation tensor([  9.0050,  -9.8573,  -9.9065, -10.8330,   8.4530, -10.8890])
+### Epoch 129:
+Training accuracy: 0.9840833333333333
+Validation accuracy: 0.9832
+after validation tensor([  9.0226,  -9.8854,  -9.9253, -10.8717,   8.4645, -10.9252])
+### Epoch 130:
+Training accuracy: 0.98385
+Validation accuracy: 0.9832
+after validation tensor([  9.0567,  -9.8845,  -9.9820, -10.9152,   8.4818, -10.9530])
+### Epoch 131:
+Training accuracy: 0.9839666666666667
+Validation accuracy: 0.9831
+after validation tensor([  9.0753,  -9.9022,  -9.9978, -10.9346,   8.4916, -10.9805])
+### Epoch 132:
+Training accuracy: 0.9836833333333334
+Validation accuracy: 0.9826
+after validation tensor([  9.0891,  -9.9244, -10.0152, -10.9530,   8.5277, -11.0077])
+### Epoch 133:
+Training accuracy: 0.9837333333333333
+Validation accuracy: 0.9833
+after validation tensor([  9.1136,  -9.9416, -10.0255, -10.9929,   8.5426, -11.0143])
+### Epoch 134:
+Training accuracy: 0.9839
+Validation accuracy: 0.9827
+after validation tensor([  9.1284,  -9.9518, -10.0511, -11.0104,   8.5663, -11.0427])
+### Epoch 135:
+Training accuracy: 0.9838333333333333
+Validation accuracy: 0.9822
+after validation tensor([  9.1402,  -9.9590, -10.0863, -11.0347,   8.6023, -11.0659])
+### Epoch 136:
+Training accuracy: 0.9835833333333334
+Validation accuracy: 0.982
+after validation tensor([  9.1683,  -9.9728, -10.1111, -11.0694,   8.6257, -11.0659])
+### Epoch 137:
+Training accuracy: 0.9838833333333333
+Validation accuracy: 0.9831
+after validation tensor([  9.1692, -10.0149, -10.1220, -11.0968,   8.6633, -11.0702])
+### Epoch 138:
+Training accuracy: 0.98355
+Validation accuracy: 0.9825
+after validation tensor([  9.1757, -10.0426, -10.1451, -11.0970,   8.6975, -11.1200])
+### Epoch 139:
+Training accuracy: 0.98335
+Validation accuracy: 0.9832
+after validation tensor([  9.1912, -10.0934, -10.1778, -11.1326,   8.7185, -11.1407])
+### Epoch 140:
+Training accuracy: 0.9839
+Validation accuracy: 0.9826
+after validation tensor([  9.2371, -10.1101, -10.1999, -11.1568,   8.7383, -11.1733])
+### Epoch 141:
+Training accuracy: 0.9839
+Validation accuracy: 0.9827
+after validation tensor([  9.2520, -10.1659, -10.2379, -11.1936,   8.7708, -11.1935])
+### Epoch 142:
+Training accuracy: 0.98395
+Validation accuracy: 0.9826
+after validation tensor([  9.2708, -10.1929, -10.2515, -11.2225,   8.7930, -11.2150])
+### Epoch 143:
+Training accuracy: 0.9837833333333333
+Validation accuracy: 0.9823
+after validation tensor([  9.3060, -10.2340, -10.2622, -11.2423,   8.8243, -11.2347])
+### Epoch 144:
+Training accuracy: 0.9838166666666667
+Validation accuracy: 0.9834
+after validation tensor([  9.3524, -10.2458, -10.2811, -11.2555,   8.8392, -11.2685])
+### Epoch 145:
+Training accuracy: 0.9841666666666666
+Validation accuracy: 0.983
+after validation tensor([  9.3840, -10.2474, -10.2847, -11.2556,   8.8580, -11.2902])
+### Epoch 146:
+Training accuracy: 0.9834166666666667
+Validation accuracy: 0.9832
+after validation tensor([  9.3934, -10.2942, -10.2918, -11.2810,   8.8803, -11.3022])
+### Epoch 147:
+Training accuracy: 0.9838333333333333
+Validation accuracy: 0.9832
+after validation tensor([  9.4355, -10.2958, -10.3084, -11.3270,   8.9056, -11.3343])
+### Epoch 148:
+Training accuracy: 0.9839333333333333
+Validation accuracy: 0.983
+after validation tensor([  9.4494, -10.3064, -10.3173, -11.3524,   8.9180, -11.3636])
+### Epoch 149:
+Training accuracy: 0.98405
+Validation accuracy: 0.9823
+after validation tensor([  9.4620, -10.3483, -10.3400, -11.3686,   8.9384, -11.3904])
+done
+End date time  2022-12-22 00:48:58.788315
