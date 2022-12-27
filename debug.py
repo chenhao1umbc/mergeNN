@@ -8,7 +8,6 @@ from typing import Tuple
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from torch.utils.data import dataset
 
 
@@ -433,9 +432,9 @@ import copy
 import time
 
 criterion = nn.CrossEntropyLoss()
-lr = 1e-4  # learning rate
-optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
+lr = 1e-3  # learning rate
+optimizer = torch.optim.RAdam(model.parameters(), lr=lr)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 100.0, gamma=0.99)
 
 def train(model: nn.Module) -> None:
     model.train()  # turn on train mode
@@ -466,7 +465,7 @@ def train(model: nn.Module) -> None:
             cur_loss = total_loss / log_interval
             ppl = math.exp(cur_loss)
             print(f'| epoch {epoch:3d} | {batch:5d}/{num_batches:5d} batches | '
-                  f'lr {lr:02.2f} | ms/batch {ms_per_batch:5.2f} | '
+                  f'lr {lr:02.4f} | ms/batch {ms_per_batch:5.2f} | '
                   f'loss {cur_loss:5.2f} | ppl {ppl:8.2f}')
             total_loss = 0
             start_time = time.time()
@@ -474,7 +473,8 @@ def train(model: nn.Module) -> None:
             "save models"
             if batch % (3*log_interval) == 0 and batch >0:
                 with torch.no_grad():
-                    torch.save(model, f'./gpt{epoch}_{batch}.pt')
+                    # torch.save(model.state_dict(), f'./gpt{epoch}_{batch}.pt')
+                    pass
                 
 def evaluate(model: nn.Module, eval_data: Tensor) -> float:
     model.eval()  # turn on evaluation mode
