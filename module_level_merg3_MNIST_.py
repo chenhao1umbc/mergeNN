@@ -40,7 +40,7 @@ def get_random_model(seed, load=False):
     torch.manual_seed(seed)
     model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
     model.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False) # original
-    if load : model.load_state_dict(torch.load(f'teachers/{id0}.pt'))
+    if load : model.load_state_dict(torch.load(f'./resnet18mnist_dict.pt'))
     for param in model.parameters():
         param.requires_grad = False
     return model

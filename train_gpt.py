@@ -1,5 +1,7 @@
 #%%
 "This code is mainly from pytorch transformer tutorial with colab"
+"Since the tutorial did not give reasonable results, now it is GPT"
+"checkout this link: https://github.com/karpathy/minGPT/blob/master/mingpt/model.py"
 import math
 from typing import Tuple
 
