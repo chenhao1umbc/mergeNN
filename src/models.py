@@ -64,7 +64,7 @@ class ASTModel(nn.Module):
             elif model_size == 'base224':
                 self.v = timm.create_model('vit_deit_base_distilled_patch16_224', pretrained=imagenet_pretrain)
             elif model_size == 'base384':
-                self.v = timm.create_model('vit_base_patch16_384', pretrained=imagenet_pretrain)
+                self.v = timm.create_model('vit_deit_base_distilled_patch16_384', pretrained=imagenet_pretrain)
             else:
                 raise Exception('Model size must be one of tiny224, small224, base224, base384.')
             self.original_num_patches = self.v.patch_embed.num_patches
