@@ -1,7 +1,7 @@
 #%%
 "Theses code is based on AST github https://github.com/YuanGongND/ast"
-import math
-from typing import Tuple
+import math, os
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 import torch
 from torch import nn, Tensor
@@ -31,7 +31,7 @@ class Arg():
         self.freqm = 24
         self.timem = 96
         self.mixup = 0
-        self.n_epochs = 3
+        self.n_epochs = 10
         self.batch_size = 16
         self.fstride = 10
         self.tstride = 10
@@ -132,7 +132,7 @@ def validate(audio_model, val_loader, args, epoch):
 
         audio_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
-        loss_mean = torch.tensor(A_loss).mean().item
+        loss_mean = torch.tensor(A_loss).mean().item()
         acc = get_acc(target, audio_output)
 
     return acc, loss_mean
@@ -175,7 +175,6 @@ def train(model, train_loader, test_loader, args):
         print(datetime.datetime.now())
 
         for i, (audio_input, labels) in enumerate(train_loader):
-            print(f"current #iter={i}")
             B = audio_input.size(0)
             audio_input = audio_input.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
@@ -193,7 +192,7 @@ def train(model, train_loader, test_loader, args):
         print('start validation')
         acc, loss = validate(model, test_loader, args, epoch)
         print("acc, loss, epoch", acc, loss, epoch)
-    torch.save(model,'ESC.pt')
+    torch.save(model,f'ESC{epoch}.pt')
     print('done')
 
 #%%
