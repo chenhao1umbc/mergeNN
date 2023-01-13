@@ -22,8 +22,8 @@ class Arg():
         fold = 1
         self.model = 'ast'
         self.dataset = 'esc50'
-        self.imagenet_pretrain = True
         self.audioset_pretrain = True
+        self.imagenet_pretrain = self.audioset_pretrain or True
         self.data_train =  f'./data/datafiles/esc_train_data_{fold}.json'
         self.data_val =  f'./data/datafiles/esc_eval_data_{fold}.json'
         self.label_csv  =  f'./src/esc_class_labels_indices.csv'
@@ -43,6 +43,7 @@ class Arg():
 
         self.metrics = 'acc'
         self.loss = 'CE'
+        self.loss_fn = nn.CrossEntropyLoss()
         self.warmup = False
         self.lrscheduler_start = 5
         self.lrscheduler_step = 1
@@ -131,10 +132,10 @@ def validate(audio_model, val_loader, args, epoch):
 
         audio_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
-        loss = torch.tensor(A_loss).mean().item
+        loss_mean = torch.tensor(A_loss).mean().item
         acc = get_acc(target, audio_output)
 
-    return acc, loss
+    return acc, loss_mean
 
 def train(model, train_loader, test_loader, args):
     device = 'cuda'
@@ -195,7 +196,6 @@ def train(model, train_loader, test_loader, args):
     torch.save(model,'ESC.pt')
     print('done')
 
-train(model, train_loader, val_loader, args)
-
 #%%
+train(model, train_loader, val_loader, args)
 validate(model, val_loader, args, 0)
