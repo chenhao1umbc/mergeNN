@@ -76,7 +76,7 @@ val_audio_conf = {'num_mel_bins': 128,
 
 
 train_loader = torch.utils.data.DataLoader(
-    dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
+ # type: ignore # type: ignore # type: ignore    dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
     batch_size=args.batch_size, shuffle=True, pin_memory=True)
 
 val_loader = torch.utils.data.DataLoader(
@@ -192,7 +192,8 @@ def train(model, train_loader, test_loader, args):
         print('start validation')
         acc, loss = validate(model, test_loader, args, epoch)
         print("acc, loss, epoch", acc, loss, epoch)
-    torch.save(model,f'ESC{epoch}.pt')
+        torch.save(model,f'ESC{epoch}.pt')
+        epoch += 1 
     print('done')
 
 #%%
