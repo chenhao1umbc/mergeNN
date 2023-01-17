@@ -7,7 +7,7 @@ import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from torch.utils.data import dataset
+import torch.utils.data as Data
 
 from src import dataloader, models
 import time, datetime
@@ -74,14 +74,35 @@ val_audio_conf = {'num_mel_bins': 128,
             'std':args.dataset_std, 
             'noise':False}
 
+if prep_data:
+    train_loader = Data.DataLoader(
+        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
+        batch_size=args.batch_size, shuffle=True, pin_memory=True)
 
-train_loader = torch.utils.data.DataLoader(
- # type: ignore # type: ignore # type: ignore    dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
-    batch_size=args.batch_size, shuffle=True, pin_memory=True)
+    val_loader = Data.DataLoader(
+        dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
+        batch_size=args.batch_size*2, shuffle=False, pin_memory=True)
+    
+    d, l = [], [] # doing the second wrap is because audo processing is slow, reading raw data and processing
+    # is redundant process. So the second wrap will significantly speed up the training and validation process
+    for i, (audio_input, labels) in enumerate(train_loader):
+        d.append(audio_input)
+        l.append(labels)
+    tr_d, tr_l = torch.cat(d), torch.cat(l)
+    torch.save([tr_d, tr_l], 'src/tr_data_label_ESC50.pt')
+    d, l = [], []
+    for i, (audio_input, labels) in enumerate(val_loader):
+        d.append(audio_input)
+        l.append(labels)
+    val_d, val_l = torch.cat(d), torch.cat(l)
+    torch.save([tr_d, tr_l], 'src/val_data_label_ESC50.pt')
 
-val_loader = torch.utils.data.DataLoader(
-    dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
-    batch_size=args.batch_size*2, shuffle=False, pin_memory=True)
+xtr, ytr = torch.load('src/tr_data_label_ESC50.pt')
+xval, yval = torch.load('src/tr_data_label_ESC50.pt')
+data = Data.TensorDataset(xtr, ytr)
+tr = Data.DataLoader(data, batch_size=args.batch_size, shuffle=True)
+data = Data.TensorDataset(xval, yval)
+val = Data.DataLoader(data, batch_size=args.batch_size*2, shuffle=True)
 
 model = models.ASTModel(label_dim=args.n_class, fstride=args.fstride, tstride=args.tstride, 
                     input_fdim=128,input_tdim=args.audio_length, imagenet_pretrain=args.imagenet_pretrain,
@@ -101,7 +122,7 @@ def get_acc(x, xhat):
     res = ind1 - ind2
     return (res == 0).sum()/res.numel()
 
-def validate(audio_model, val_loader, args, epoch):
+def validate(audio_model, val_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     audio_model = audio_model.to(device)
     # switch to evaluate mode
@@ -192,10 +213,10 @@ def train(model, train_loader, test_loader, args):
         print('start validation')
         acc, loss = validate(model, test_loader, args, epoch)
         print("acc, loss, epoch", acc, loss, epoch)
-        torch.save(model,f'ESC{epoch}.pt')
+        torch.save(model,f'ESC{epoch}_good.pt')
         epoch += 1 
     print('done')
 
 #%%
-train(model, train_loader, val_loader, args)
-validate(model, val_loader, args, 0)
+train(model, tr, val, args)
+validate(model, val, args)

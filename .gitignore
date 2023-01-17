@@ -137,3 +137,6 @@ students/
 #others
 .out
 .slurm
+.pt
+.pth
+.jason
