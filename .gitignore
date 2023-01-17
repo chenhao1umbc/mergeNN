@@ -135,8 +135,8 @@ teachers/
 students/
 
 #others
-.out
-.slurm
-.pt
-.pth
-.jason
+*.out
+*.slurm
+*.pt
+*.pth
+*.json
