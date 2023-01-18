@@ -1,13 +1,13 @@
 #%%
 "Theses code is based on AST github https://github.com/YuanGongND/ast"
-import math
-from typing import Tuple
+import math, os
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from torch.utils.data import dataset
+import torch.utils.data as Data
 
 from src import dataloader, models
 import time, datetime
@@ -22,8 +22,8 @@ class Arg():
         fold = 1
         self.model = 'ast'
         self.dataset = 'esc50'
-        self.imagenet_pretrain = True
         self.audioset_pretrain = True
+        self.imagenet_pretrain = self.audioset_pretrain or True
         self.data_train =  f'./data/datafiles/esc_train_data_{fold}.json'
         self.data_val =  f'./data/datafiles/esc_eval_data_{fold}.json'
         self.label_csv  =  f'./src/esc_class_labels_indices.csv'
@@ -31,7 +31,7 @@ class Arg():
         self.freqm = 24
         self.timem = 96
         self.mixup = 0
-        self.n_epochs = 3
+        self.n_epochs = 10
         self.batch_size = 16
         self.fstride = 10
         self.tstride = 10
@@ -43,6 +43,7 @@ class Arg():
 
         self.metrics = 'acc'
         self.loss = 'CE'
+        self.loss_fn = nn.CrossEntropyLoss()
         self.warmup = False
         self.lrscheduler_start = 5
         self.lrscheduler_step = 1
@@ -73,14 +74,35 @@ val_audio_conf = {'num_mel_bins': 128,
             'std':args.dataset_std, 
             'noise':False}
 
+if prep_data:
+    train_loader = Data.DataLoader(
+        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
+        batch_size=args.batch_size, shuffle=True, pin_memory=True)
 
-train_loader = torch.utils.data.DataLoader(
-    dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
-    batch_size=args.batch_size, shuffle=True, pin_memory=True)
+    val_loader = Data.DataLoader(
+        dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
+        batch_size=args.batch_size*2, shuffle=False, pin_memory=True)
+    
+    d, l = [], [] # doing the second wrap is because audo processing is slow, reading raw data and processing
+    # is redundant process. So the second wrap will significantly speed up the training and validation process
+    for i, (audio_input, labels) in enumerate(train_loader):
+        d.append(audio_input)
+        l.append(labels)
+    tr_d, tr_l = torch.cat(d), torch.cat(l)
+    torch.save([tr_d, tr_l], 'src/tr_data_label_ESC50.pt')
+    d, l = [], []
+    for i, (audio_input, labels) in enumerate(val_loader):
+        d.append(audio_input)
+        l.append(labels)
+    val_d, val_l = torch.cat(d), torch.cat(l)
+    torch.save([tr_d, tr_l], 'src/val_data_label_ESC50.pt')
 
-val_loader = torch.utils.data.DataLoader(
-    dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
-    batch_size=args.batch_size*2, shuffle=False, pin_memory=True)
+xtr, ytr = torch.load('src/tr_data_label_ESC50.pt')
+xval, yval = torch.load('src/tr_data_label_ESC50.pt')
+data = Data.TensorDataset(xtr, ytr)
+tr = Data.DataLoader(data, batch_size=args.batch_size, shuffle=True)
+data = Data.TensorDataset(xval, yval)
+val = Data.DataLoader(data, batch_size=args.batch_size*2, shuffle=True)
 
 model = models.ASTModel(label_dim=args.n_class, fstride=args.fstride, tstride=args.tstride, 
                     input_fdim=128,input_tdim=args.audio_length, imagenet_pretrain=args.imagenet_pretrain,
@@ -100,7 +122,7 @@ def get_acc(x, xhat):
     res = ind1 - ind2
     return (res == 0).sum()/res.numel()
 
-def validate(audio_model, val_loader, args, epoch):
+def validate(audio_model, val_loader, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     audio_model = audio_model.to(device)
     # switch to evaluate mode
@@ -131,10 +153,10 @@ def validate(audio_model, val_loader, args, epoch):
 
         audio_output = torch.cat(A_predictions)
         target = torch.cat(A_targets)
-        loss = torch.tensor(A_loss).mean().item
+        loss_mean = torch.tensor(A_loss).mean().item()
         acc = get_acc(target, audio_output)
 
-    return acc, loss
+    return acc, loss_mean
 
 def train(model, train_loader, test_loader, args):
     device = 'cuda'
@@ -154,16 +176,8 @@ def train(model, train_loader, test_loader, args):
     elif args.loss == 'CE':
         loss_fn = nn.CrossEntropyLoss()
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, 
-        list(range(args.lrscheduler_start, 1000, args.lrscheduler_step)),
-        gamma=args.lrscheduler_decay)
     args.loss_fn = loss_fn
-    print('now training with {:s}, main metrics: {:s}, loss function: {:s}, learning rate scheduler: {:s}'.format(str(args.dataset), str(main_metrics), str(loss_fn), str(scheduler)))
-    print('The learning rate scheduler starts at {:d} epoch with decay rate of {:.3f} every {:d} epochs'.format(args.lrscheduler_start, args.lrscheduler_decay, args.lrscheduler_step))
-
-    # for amp
     scaler = GradScaler()
-
     print("current #steps=%s, #epochs=%s" % (global_step, epoch))
     print("start training...")
 
@@ -174,8 +188,7 @@ def train(model, train_loader, test_loader, args):
         print(datetime.datetime.now())
 
         for i, (audio_input, labels) in enumerate(train_loader):
-            print(f"current #iter={i}")
-            B = audio_input.size(0)
+            model.train()
             audio_input = audio_input.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
@@ -188,14 +201,18 @@ def train(model, train_loader, test_loader, args):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-
+            acc, loss = validate(model, test_loader, args)
+            print("acc, loss, iter", acc, loss, i)
+            torch.save(model,f'ESC{i}_mid.pt')
+            model.train()
+        print(stop)
         print('start validation')
-        acc, loss = validate(model, test_loader, args, epoch)
+        acc, loss = validate(model, test_loader, args)
         print("acc, loss, epoch", acc, loss, epoch)
-    torch.save(model,'ESC.pt')
+        
+        epoch += 1 
     print('done')
 
-train(model, train_loader, val_loader, args)
-
 #%%
-validate(model, val_loader, args, 0)
+train(model, tr, val, args)
+# validate(model, val, args)
