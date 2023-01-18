@@ -73,18 +73,41 @@ val_audio_conf = {'num_mel_bins': 128,
             'std':args.dataset_std, 
             'noise':False}
 
+if prep_data:
+    train_loader = Data.DataLoader(
+        dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
+        batch_size=args.batch_size, shuffle=True, pin_memory=True)
 
-train_loader = torch.utils.data.DataLoader(
-    dataloader.AudiosetDataset(args.data_train, label_csv=args.label_csv, audio_conf=audio_conf),
-    batch_size=args.batch_size, shuffle=True, pin_memory=True)
+    val_loader = Data.DataLoader(
+        dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
+        batch_size=args.batch_size*2, shuffle=False, pin_memory=True)
+    
+    d, l = [], [] # doing the second wrap is because audo processing is slow, reading raw data and processing
+    # is redundant process. So the second wrap will significantly speed up the training and validation process
+    for i, (audio_input, labels) in enumerate(train_loader):
+        d.append(audio_input)
+        l.append(labels)
+    tr_d, tr_l = torch.cat(d), torch.cat(l)
+    torch.save([tr_d, tr_l], 'src/tr_data_label_ESC50.pt')
+    d, l = [], []
+    for i, (audio_input, labels) in enumerate(val_loader):
+        d.append(audio_input)
+        l.append(labels)
+    val_d, val_l = torch.cat(d), torch.cat(l)
+    torch.save([tr_d, tr_l], 'src/val_data_label_ESC50.pt')
 
-val_loader = torch.utils.data.DataLoader(
-    dataloader.AudiosetDataset(args.data_val, label_csv=args.label_csv, audio_conf=val_audio_conf),
-    batch_size=args.batch_size*2, shuffle=False, pin_memory=True)
+xtr, ytr = torch.load('src/tr_data_label_ESC50.pt')
+xval, yval = torch.load('src/tr_data_label_ESC50.pt')
+data = Data.TensorDataset(xtr, ytr)
+tr = Data.DataLoader(data, batch_size=args.batch_size, shuffle=True)
+data = Data.TensorDataset(xval, yval)
+val = Data.DataLoader(data, batch_size=args.batch_size*2, shuffle=True)
 
 model = models.ASTModel(label_dim=args.n_class, fstride=args.fstride, tstride=args.tstride, 
                     input_fdim=128,input_tdim=args.audio_length, imagenet_pretrain=args.imagenet_pretrain,
                     audioset_pretrain=args.audioset_pretrain, model_size='base384')
+
+
 #%% evaluate each of the model
 names = [f'./data/transformers/tranf_model_{i}_{j}.pt' for i in range(1,4) for j in range(600, 2401, 600)] 
 the10 = names[2:]
@@ -118,37 +141,4 @@ optimizer = torch.optim.RAdam([loga],
                 betas=(0.9, 0.999), 
                 eps=1e-8,
                 weight_decay=0)
-best_val_loss = float('inf')
-epochs = 10
-best_model = None
-for epoch in range(1, epochs + 1):
-    epoch_start_time = time.time()
-    total_loss = 0.
-    log_interval = 200
-    start_time = time.time()
-    src_mask = generate_square_subsequent_mask(bptt).to(device)
 
-    num_batches = len(train_data) // bptt
-    for ii, seq in enumerate(range(0, train_data.size(0) - 1, bptt)):
-        data, targets = get_batch(train_data, seq)
-        seq_len = data.size(0)
-        if seq_len != bptt:  # only on last batch
-            src_mask = src_mask[:seq_len, :seq_len]
-        g = hard_concrete(loga, batch_size=targets.shape[0]) # [1, 10]
-        l = 0
-        for i, model in enumerate(models):
-            output = model(data, src_mask)
-            l = l + criterion(output.view(-1, ntokens)*g[0,i,None], targets)
-            
-        loss = l + lamb*(g.mean() -1/10)
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_([loga], 0.5)
-        optimizer.step()
-
-        total_loss += loss.item()
-        if ii % log_interval == 0 and ii > 0:
-            print(ii)
-            print(loga.cpu().data, l.cpu().data, lamb*(g.mean() -1/10).cpu().data, loss.cpu().data)
-            total_loss = 0
-            start_time = time.time()
