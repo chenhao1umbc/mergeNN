@@ -107,10 +107,55 @@ model = models.ASTModel(label_dim=args.n_class, fstride=args.fstride, tstride=ar
                     input_fdim=128,input_tdim=args.audio_length, imagenet_pretrain=args.imagenet_pretrain,
                     audioset_pretrain=args.audioset_pretrain, model_size='base384')
 
+def get_acc(x, xhat):
+    """x shape of [batch_size, n_class], xhat has the same shape as x
+    x is one-hot encoding
+
+    Args:
+        x (matrix): ground truth
+        xhat (matrix): predictions
+    """
+    _, ind1 = x.max(dim=1)
+    _, ind2 = xhat.max(dim=1)
+    res = ind1 - ind2
+    return (res == 0).sum()/res.numel()
+
+def validate(audio_model, val_loader):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    audio_model = audio_model.to(device)
+    # switch to evaluate mode
+    audio_model.eval()
+
+    A_predictions = []
+    A_targets = []
+    A_loss = []
+    with torch.no_grad():
+        for i, (audio_input, labels) in enumerate(val_loader):
+            audio_input = audio_input.to(device)
+
+            # compute output
+            audio_output = audio_model(audio_input)
+            audio_output = torch.sigmoid(audio_output)
+            predictions = audio_output.to('cpu').detach()
+
+            A_predictions.append(predictions)
+            A_targets.append(labels)
+
+            # compute the loss
+            labels = labels.to(device)
+            loss_fn = nn.CrossEntropyLoss()
+            loss = loss_fn(audio_output, labels)
+            A_loss.append(loss.to('cpu').detach())
+
+        audio_output = torch.cat(A_predictions)
+        target = torch.cat(A_targets)
+        loss_mean = torch.tensor(A_loss).mean().item()
+        acc = get_acc(target, audio_output)
+
+    return acc, loss_mean
 
 #%% evaluate each of the model
-names = [f'./data/transformers/tranf_model_{i}_{j}.pt' for i in range(1,4) for j in range(600, 2401, 600)] 
-the10 = names[2:]
+the10 = [f'./src/ESC{i}_mid.pt' for i in (10, 11, 35, 36, 37, 60, 61, 62, 90, 99)] 
 res = []
 models = []
 for name in the10:
@@ -119,9 +164,9 @@ for name in the10:
     for param in model.parameters():
         param.requires_grad_(False)
     models.append(model)
-    test_loss = evaluate(model, test_data)
-    test_ppl = math.exp(test_loss)
-    res.append(test_ppl)
+    test_loss = validate(model, val)
+    res.append(test_loss)
+plt.bar(res)
 
 #%% merging the models
 oc_sd=0.01

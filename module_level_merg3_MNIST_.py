@@ -40,7 +40,7 @@ def get_random_model(seed, load=False):
     torch.manual_seed(seed)
     model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False)
     model.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False) # original
-    if load : model.load_state_dict(torch.load(f'./resnet18mnist_dict.pt'))
+    if load : model.load_state_dict(torch.load(f'./src/resnet18mnist_dict.pt'))
     for param in model.parameters():
         param.requires_grad = False
     return model
@@ -198,8 +198,8 @@ plt.figure(figsize=(4,3), dpi=300)
 plt.plot(epochs_list, train_accs, '--x', markevery=10)
 plt.plot(epochs_list, val_accs, '-.v', markevery=15)
 plt.legend(['training set accuracy', 'validation set accuracy'],fontsize=12)
-plt.xlabel('epoch',fontsize=12)
-plt.ylabel('prediction accuracy',fontsize=12)
+plt.xlabel('Epoch',fontsize=12)
+plt.ylabel('Prediction accuracy',fontsize=12)
 plt.tight_layout()
 plt.savefig('train_val.png')
 plt.show()
