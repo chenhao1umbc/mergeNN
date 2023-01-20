@@ -123,15 +123,15 @@ with torch.no_grad():
         test_losses[2] += KLD.item()
         break
 
-    n = min(data.size(0), 6)
+    n = min(data.size(0), 8)
     ncols = 4
-    comparison = torch.zeros(6*4,1,28,28)
+    comparison = torch.zeros(n*ncols,1,28,28)
     comparison[:n] = data.view(data.size(0), 1, 28, 28)[:n]
     comparison[n:2*n] = recon_y.view(data.size(0), 1, 28, 28)[:n]
     comparison[2*n:3*n] = recons[:,0].view(data.size(0), 1, 28, 28)[:n]
     comparison[3*n:4*n] = recons[:,1].view(data.size(0), 1, 28, 28)[:n]
 
-    grid = make_grid(comparison,nrow=6)
+    grid = make_grid(comparison,nrow=n)
     
     ndarr = grid.mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to("cpu", torch.uint8).numpy()
     im = Image.fromarray(ndarr)
