@@ -1,6 +1,7 @@
 #%%
 "This code is made to perform model level merge of the pretrained transformers"
-import math
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 from typing import Tuple
 from utils import *
 import torch
@@ -32,7 +33,7 @@ class Arg():
         self.timem = 96
         self.mixup = 0
         self.n_epochs = 3
-        self.batch_size = 16
+        self.batch_size = 64
         self.fstride = 10
         self.tstride = 10
 
@@ -156,21 +157,24 @@ def validate(audio_model, val_loader):
 
 #%% evaluate each of the model
 the10 = [f'./src/ESC{i}_mid.pt' for i in (10, 11, 35, 36, 37, 60, 61, 62, 90, 99)] 
+evaluate_models = False
 res = []
-models = []
+ten_models = []
 for name in the10:
     model = torch.load(name)
     model.eval()
     for param in model.parameters():
         param.requires_grad_(False)
-    models.append(model)
-    test_loss = validate(model, val)
-    res.append(test_loss)
-plt.bar(res)
+    ten_models.append(model)
+
+    if evaluate_models:
+        test_loss = validate(model, val)
+        res.append(test_loss)
 
 #%% merging the models
-oc_sd=0.01
-lamb = 5
+oc_sd = 0.01
+lamb, rho = 1, 10
+lr = 1e-1
 loga = (torch.randn(10)*oc_sd).cuda().requires_grad_()
 print('initial loga', loga)
 def hard_concrete(loga, batch_size=128):
@@ -182,8 +186,24 @@ def hard_concrete(loga, batch_size=128):
     return z
 
 optimizer = torch.optim.RAdam([loga],
-                lr= 1e-3,
+                lr= lr,
                 betas=(0.9, 0.999), 
                 eps=1e-8,
                 weight_decay=0)
+loss_fn = nn.CrossEntropyLoss()
+
+epochs = 5
+for epoch in range(epochs):
+    for i, (tr_d, tr_l) in enumerate(val):
+        tr_d, tr_l = tr_d.cuda(), tr_l.cuda()
+        loss1 = 0
+        optimizer.zero_grad()
+        z = hard_concrete(loga, batch_size=tr_d.shape[0])
+        for ii, model in enumerate(ten_models):
+            loss1 += loss_fn(z[:,ii:ii+1]*model(tr_d), torch.argmax(tr_l, axis=1))
+        loss = loss1 + lamb*(z.mean() - 1/10) + rho* ((z.mean(-1) - 1/10)**2).mean()
+        loss.backward()
+        optimizer.step()
+        print(f'loga, epoch, iter', loga, epoch, i)
+
 
