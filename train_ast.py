@@ -1,13 +1,14 @@
 #%%
-"Theses code is based on AST github https://github.com/YuanGongND/ast"
-import math, os
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
+"This code is made to perform model level merge of the pretrained transformers"
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
+from typing import Tuple
+from utils import *
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-import torch.utils.data as Data
+from torch.utils.data import dataset
 
 from src import dataloader, models
 import time, datetime
@@ -22,8 +23,8 @@ class Arg():
         fold = 1
         self.model = 'ast'
         self.dataset = 'esc50'
+        self.imagenet_pretrain = True
         self.audioset_pretrain = True
-        self.imagenet_pretrain = self.audioset_pretrain or True
         self.data_train =  f'./data/datafiles/esc_train_data_{fold}.json'
         self.data_val =  f'./data/datafiles/esc_eval_data_{fold}.json'
         self.label_csv  =  f'./src/esc_class_labels_indices.csv'
@@ -31,8 +32,8 @@ class Arg():
         self.freqm = 24
         self.timem = 96
         self.mixup = 0
-        self.n_epochs = 10
-        self.batch_size = 16
+        self.n_epochs = 3
+        self.batch_size = 64
         self.fstride = 10
         self.tstride = 10
 
@@ -43,7 +44,6 @@ class Arg():
 
         self.metrics = 'acc'
         self.loss = 'CE'
-        self.loss_fn = nn.CrossEntropyLoss()
         self.warmup = False
         self.lrscheduler_start = 5
         self.lrscheduler_step = 1
@@ -107,8 +107,7 @@ val = Data.DataLoader(data, batch_size=args.batch_size*2, shuffle=True)
 model = models.ASTModel(label_dim=args.n_class, fstride=args.fstride, tstride=args.tstride, 
                     input_fdim=128,input_tdim=args.audio_length, imagenet_pretrain=args.imagenet_pretrain,
                     audioset_pretrain=args.audioset_pretrain, model_size='base384')
-#%%
-from torch.cuda.amp import autocast,GradScaler
+
 def get_acc(x, xhat):
     """x shape of [batch_size, n_class], xhat has the same shape as x
     x is one-hot encoding
@@ -122,7 +121,7 @@ def get_acc(x, xhat):
     res = ind1 - ind2
     return (res == 0).sum()/res.numel()
 
-def validate(audio_model, val_loader, args):
+def validate(audio_model, val_loader):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     audio_model = audio_model.to(device)
     # switch to evaluate mode
@@ -145,10 +144,8 @@ def validate(audio_model, val_loader, args):
 
             # compute the loss
             labels = labels.to(device)
-            if isinstance(args.loss_fn, torch.nn.CrossEntropyLoss):
-                loss = args.loss_fn(audio_output, torch.argmax(labels.long(), axis=1))
-            else:
-                loss = args.loss_fn(audio_output, labels)
+            loss_fn = nn.CrossEntropyLoss()
+            loss = loss_fn(audio_output, labels)
             A_loss.append(loss.to('cpu').detach())
 
         audio_output = torch.cat(A_predictions)
@@ -158,65 +155,55 @@ def validate(audio_model, val_loader, args):
 
     return acc, loss_mean
 
-def train(model, train_loader, test_loader, args):
-    device = 'cuda'
-    model = model.cuda()
-    
-    # Set up the optimizer
-    global_step, epoch = 0, 1
-    trainables = [p for p in model.parameters() if p.requires_grad]
-    print('Total parameter number is : {:.3f} million'.format(sum(p.numel() for p in model.parameters()) / 1e6))
-    print('Total trainable parameter number is : {:.3f} million'.format(sum(p.numel() for p in trainables) / 1e6))
-    optimizer = torch.optim.Adam(trainables, args.lr, weight_decay=5e-7, betas=(0.95, 0.999))
+#%% evaluate each of the model
+the10 = [f'./src/ESC{i}_mid.pt' for i in (10, 11, 35, 36, 37, 60, 61, 62, 90, 99)] 
+evaluate_models = False
+res = []
+ten_models = []
+for name in the10:
+    model = torch.load(name)
+    model.eval()
+    for param in model.parameters():
+        param.requires_grad_(False)
+    ten_models.append(model)
 
-    # dataset specific settings
-    main_metrics = args.metrics
-    if args.loss == 'BCE':
-        loss_fn = nn.BCEWithLogitsLoss()
-    elif args.loss == 'CE':
-        loss_fn = nn.CrossEntropyLoss()
+    if evaluate_models:
+        test_loss = validate(model, val)
+        res.append(test_loss)
 
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, 
-        list(range(args.lrscheduler_start, 1000, args.lrscheduler_step)),
-        gamma=args.lrscheduler_decay)
-    args.loss_fn = loss_fn
-    print('now training with {:s}, main metrics: {:s}, loss function: {:s}, learning rate scheduler: {:s}'.format(str(args.dataset), str(main_metrics), str(loss_fn), str(scheduler)))
-    print('The learning rate scheduler starts at {:d} epoch with decay rate of {:.3f} every {:d} epochs'.format(args.lrscheduler_start, args.lrscheduler_decay, args.lrscheduler_step))
+#%% merging the models
+oc_sd = 0.01
+lamb, rho = 1, 10
+lr = 1e-1
+loga = (torch.randn(10)*oc_sd).cuda().requires_grad_()
+print('initial loga', loga)
+def hard_concrete(loga, batch_size=128):
+    beta, gamma, zeta, eps = 2/3, -0.1, 1.1, 1e-20
+    u = torch.rand(batch_size, loga.shape[0], device=loga.device)
+    s = torch.sigmoid((torch.log(u+eps) - torch.log(1 - u+eps) + loga) / beta)
+    sbar = s * (zeta - gamma) + gamma
+    z = hard_sigmoid(sbar)
+    return z
 
-    # for amp
-    scaler = GradScaler()
+optimizer = torch.optim.RAdam([loga],
+                lr= lr,
+                betas=(0.9, 0.999), 
+                eps=1e-8,
+                weight_decay=0)
+loss_fn = nn.CrossEntropyLoss()
 
-    print("current #steps=%s, #epochs=%s" % (global_step, epoch))
-    print("start training...")
+epochs = 5
+for epoch in range(epochs):
+    for i, (tr_d, tr_l) in enumerate(val):
+        tr_d, tr_l = tr_d.cuda(), tr_l.cuda()
+        loss1 = 0
+        optimizer.zero_grad()
+        z = hard_concrete(loga, batch_size=tr_d.shape[0])
+        for ii, model in enumerate(ten_models):
+            loss1 += loss_fn(z[:,ii:ii+1]*model(tr_d), torch.argmax(tr_l, axis=1))
+        loss = loss1 + lamb*(z.mean() - 1/10) + rho* ((z.mean(-1) - 1/10)**2).mean()
+        loss.backward()
+        optimizer.step()
+        print(f'loga, epoch, iter', loga, epoch, i)
 
-    model.train()
-    while epoch < args.n_epochs + 1:
-        model.train()
-        print('---------------')
-        print(datetime.datetime.now())
 
-        for i, (audio_input, labels) in enumerate(train_loader):
-            B = audio_input.size(0)
-            audio_input = audio_input.to(device, non_blocking=True)
-            labels = labels.to(device, non_blocking=True)
-
-            with autocast():
-                audio_output = model(audio_input)
-                loss = loss_fn(audio_output, torch.argmax(labels.long(), axis=1))
-
-            # optimiztion if amp is used
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-        print('start validation')
-        acc, loss = validate(model, test_loader, args, epoch)
-        print("acc, loss, epoch", acc, loss, epoch)
-        torch.save(model,f'ESC{epoch}_good.pt')
-        epoch += 1 
-    print('done')
-
-#%%
-train(model, tr, val, args)
-validate(model, val, args)
