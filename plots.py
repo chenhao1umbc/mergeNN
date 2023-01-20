@@ -95,17 +95,44 @@ plt.ylabel('Value',fontsize=12)
 plt.tight_layout() # otherwise the text will be chopped off
 plt.savefig('module_loga.png')
 
-#%%
+#%% 10 model performance barchart
 h = [0.1606, 0.1744, 0.5225, 0.5387, 0.5587, 0.8438, 0.8456, 0.8506, 0.9413, 0.9581, 0.9581]
 plt.figure(figsize=(10,5))
-# for i in range(4):
-#     rgb = torch.rand(3).tolist()
-#     if i == 0: plt.bar([str(ii) for ii in range(1, 6)], h[:5], width=0.6, color=[rgb])
-#     if i == 1: plt.bar([str(ii) for ii in range(6, 9)], h[5:8], width=0.6, color=[rgb])
-#     if i == 2: plt.bar([str(9), str(10)], h[8:10], width=0.6, color=[rgb])
-#     if i == 3: plt.bar('Merged', h[10], width=0.6, color=[rgb])
 plt.bar([str(i) for i in range(1, 11)], h[:10])
 plt.bar('Merged', h[10], color='#ff7f0e')
 plt.xlabel('Model index')
 plt.ylabel('Accuracy')
 plt.savefig('bar.png')
+
+#%% vae example plots, attach the code to the end of the traning_vae file
+model.load_state_dict(torch.load('saves/model_vae_K2.pt'))
+from PIL import Image, ImageColor, ImageDraw, ImageFont
+model.eval()
+test_losses = torch.zeros(3)
+epoch = 1
+beta = min(1.0,(epoch)/min(args.epochs,args.warm_up)) * args.beta_max
+with torch.no_grad():
+    for i, (data,_) in enumerate(test_loader):
+        data = mix_data(data.to(device))[0].view(-1,dimx)
+
+        recon_y, mu_z, logvar_z, recons = model(data)
+        loss, ELL, KLD = loss_function(data,recon_y, mu_z, logvar_z, beta=beta)
+
+        test_losses[0] += loss.item()
+        test_losses[1] += ELL.item()
+        test_losses[2] += KLD.item()
+        break
+
+    n = min(data.size(0), 6)
+    ncols = 4
+    comparison = torch.zeros(6*4,1,28,28)
+    comparison[:n] = data.view(data.size(0), 1, 28, 28)[:n]
+    comparison[n:2*n] = recon_y.view(data.size(0), 1, 28, 28)[:n]
+    comparison[2*n:3*n] = recons[:,0].view(data.size(0), 1, 28, 28)[:n]
+    comparison[3*n:4*n] = recons[:,1].view(data.size(0), 1, 28, 28)[:n]
+
+    grid = make_grid(comparison,nrow=6)
+    
+    ndarr = grid.mul(255).add_(0.5).clamp_(0, 255).permute(1, 2, 0).to("cpu", torch.uint8).numpy()
+    im = Image.fromarray(ndarr)
+    im.save('vae_examples.png')
