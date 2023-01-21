@@ -1,3 +1,11 @@
+"""
+This file is based on the https://github.com/jundsp/VAE-BSS
+Users should first git clone the repo,
+then put this file in the file and run.
+
+(do not run it in this folder, it pops up errors)
+"""
+
 #%%
 import numpy as np
 import torch
