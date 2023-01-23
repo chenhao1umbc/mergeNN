@@ -32,7 +32,6 @@ args.batch_size = 64
 args.dimz = 20
 args.sources = 2 # number of sources
 args.variational = True
-args.learning_rate = 2e-4
 args.decay = 0.9998
 args.epochs = 10
 args.save_interval = 1
@@ -40,7 +39,9 @@ args.prior = 0.5
 args.scale = 'gauss'
 args.warm_up = 50
 args.beta_max = 0.5
-args.log_interval = 10
+
+args.learning_rate = 1e-3
+args.log_interval = 100
 
 #%%
 class Container(nn.Module):
@@ -58,7 +59,6 @@ class Container(nn.Module):
         self.variational = variational
 
         chans = (700, 600, 500, 400, 300)
-
         self.out_z = nn.Linear(chans[-1],2*self.n_sources*self.dimz).requires_grad_(False)
         self.out_w = nn.Linear(chans[-1],self.n_sources).requires_grad_(False)
 
@@ -95,8 +95,10 @@ class Container(nn.Module):
         return torch.min(torch.max(x, torch.zeros_like(x)), torch.ones_like(x))
 
     def encode(self, x):
+        self.s = []
         xo = self.Encoder[0](x)
         s = self.hard_concrete(self.loga[:2], xo.shape[0])
+        self.s.append(s)
         xo = s[:, :1]*self.Encoder[1].block[0](xo) + s[:, 1:]*self.alt_layer1(xo)
         xo = self.Encoder[1].block[1](xo)
         d = self.Encoder[1].block[2](xo)
@@ -117,6 +119,7 @@ class Container(nn.Module):
         xo = self.Decoder[0](z.view(-1,self.dimz))
         xo = self.Decoder[1](xo)
         s = self.hard_concrete(self.loga[2:], xo.shape[0])
+        self.s.append(s) # defined in self.encode
         xo = s[:, :1]*self.Decoder[2].block[0](xo) + s[:, 1:]*self.alt_layer2(xo)
         xo = self.Decoder[2].block[1](xo)
         d = self.Decoder[2].block[2](xo)
@@ -132,15 +135,15 @@ class Container(nn.Module):
         z = self.reparameterize(mu, logvar)
         recon_x, recons = self.decode(z)
 
-        return recon_x, mu, logvar, recons
+        return recon_x, mu, logvar, recons, self.s
 
 #%%
 model_secondary = VAE(dimx=28*28,dimz=20,n_sources=2).cuda()
-model_secondary.load_state_dict(torch.load('saves/pretrained/model_vae_K2.pt'))
+model_secondary.load_state_dict(torch.load('saves/model_vae_K2.pt'))
 for p in model_secondary.parameters():
     p.requires_grad_(False)
 model = Container().cuda()
-model.load_state_dict(torch.load('saves/model_vae_K2.pt'), strict=False)
+model.load_state_dict(torch.load('saves/pretrained/model_vae_K2.pt'), strict=False)
 model.alt_layer1.weight = model_secondary.Encoder[1].block[0].weight
 model.alt_layer1.bias = model_secondary.Encoder[1].block[0].bias
 model.alt_layer2.weight = model_secondary.Decoder[2].block[0].weight
@@ -150,6 +153,8 @@ device = 'cuda'
 dimx = 28*28
 kwargs = {'num_workers': 4, 'pin_memory': True} if True else {}
 train_loader, test_loader = get_data_loaders('data', 64, kwargs)
+
+lamb, rho = 1, 0
 loss_function = Loss(sources=args.sources,likelihood='laplace',variational=args.variational,prior=args.prior,scale=args.scale)
 
 # epoch = 1
@@ -167,9 +172,10 @@ for epoch in range(1, args.epochs+1):
         data = mix_data(data.to(device))[0].view(-1,dimx)
 
         optimizer.zero_grad()
-        recon_y, mu_z, logvar_z, _ = model(data)
+        recon_y, mu_z, logvar_z, _, reg = model(data)
         loss, ELL, KLD = loss_function(data,recon_y, mu_z, logvar_z, beta=beta)
-        loss.backward()
+        loss_all = loss + lamb*(reg[0].mean()+ reg[1].mean() -1)
+        loss_all.backward()
         optimizer.step()
 
         train_losses[0] += loss.item()
@@ -181,7 +187,8 @@ for epoch in range(1, args.epochs+1):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader),
                 ELL.item() / len(data),KLD.item() / len(data),loss.item() / len(data)))
-
+            print(model.loga)
+            
     train_losses /= len(train_loader.dataset)
     print('====> Epoch: {} Average loss: {:.4f}'.format(
             epoch, train_losses[0]))
