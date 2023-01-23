@@ -5,7 +5,6 @@ then put this file in the file and run.
 
 (do not run it in this folder, it pops up errors)
 """
-
 #%%
 import numpy as np
 import torch
@@ -60,8 +59,8 @@ class Container(nn.Module):
 
         chans = (700, 600, 500, 400, 300)
 
-        self.out_z = nn.Linear(chans[-1],2*self.n_sources*self.dimz).requires_grad_(False),
-        self.out_w = nn.Linear(chans[-1],self.n_sources).requires_grad_(False),
+        self.out_z = nn.Linear(chans[-1],2*self.n_sources*self.dimz).requires_grad_(False)
+        self.out_w = nn.Linear(chans[-1],self.n_sources).requires_grad_(False)
 
         self.Encoder = nn.Sequential(
             LinearBlock(self.dimx, chans[0]).requires_grad_(False),
@@ -89,15 +88,20 @@ class Container(nn.Module):
         u = torch.rand(batch_size, loga.shape[0], device=loga.device)
         s = torch.sigmoid((torch.log(u+eps) - torch.log(1 - u+eps) + loga) / beta)
         sbar = s * (zeta - gamma) + gamma
-        z = self.hard_sigmoid(sbar)
+        z = self.hard_sigmoid(sbar) # shape of [btsize, len(loga)]
         return z
 
     def hard_sigmoid(self, x):
         return torch.min(torch.max(x, torch.zeros_like(x)), torch.ones_like(x))
 
     def encode(self, x):
-        # d = self.Encoder[1].block[0]
-        d = self.Encoder(x)
+        xo = self.Encoder[0](x)
+        s = self.hard_concrete(self.loga[:2], xo.shape[0])
+        xo = s[:, :1]*self.Encoder[1].block[0](xo) + s[:, 1:]*self.alt_layer1(xo)
+        xo = self.Encoder[1].block[1](xo)
+        d = self.Encoder[1].block[2](xo)
+        for i in range(2, len(self.Encoder)):
+            d = self.Encoder[i](d)
         dz = self.out_z(d)
         mu = dz[:,::2]
         logvar = dz[:,1::2]
@@ -109,7 +113,16 @@ class Container(nn.Module):
         return mu + eps*std
 
     def decode(self, z):
-        d = self.Decoder(z.view(-1,self.dimz))
+        # d = self.Decoder(z.view(-1,self.dimz))
+        xo = self.Decoder[0](z.view(-1,self.dimz))
+        xo = self.Decoder[1](xo)
+        s = self.hard_concrete(self.loga[2:], xo.shape[0])
+        xo = s[:, :1]*self.Decoder[2].block[0](xo) + s[:, 1:]*self.alt_layer2(xo)
+        xo = self.Decoder[2].block[1](xo)
+        d = self.Decoder[2].block[2](xo)
+        for i in range(3, len(self.Decoder)):
+            d = self.Encoder[i](d)    
+
         recon_separate = torch.sigmoid(d).view(-1,self.n_sources,self.dimx)
         recon_x = recon_separate.sum(1) 
         return recon_x, recon_separate
@@ -133,25 +146,53 @@ model.alt_layer1.bias = model_secondary.Encoder[1].block[0].bias
 model.alt_layer2.weight = model_secondary.Decoder[2].block[0].weight
 model.alt_layer2.bias = model_secondary.Decoder[2].block[0].bias
 
-#%%
 device = 'cuda'
 dimx = 28*28
 kwargs = {'num_workers': 4, 'pin_memory': True} if True else {}
-test_losses = torch.zeros(3)
 train_loader, test_loader = get_data_loaders('data', 64, kwargs)
 loss_function = Loss(sources=args.sources,likelihood='laplace',variational=args.variational,prior=args.prior,scale=args.scale)
 
-epoch = 1
-beta = min(1.0,(epoch)/min(args.epochs,args.warm_up)) * args.beta_max
+# epoch = 1
+# beta = min(1.0,(epoch)/min(args.epochs,args.warm_up)) * args.beta_max
 
 #%%
-for i, (data,_) in enumerate(test_loader):
-    data = mix_data(data.to(device))[0].view(-1,dimx)
+for epoch in range(1, args.epochs+1):
+    beta = min(1.0,(epoch)/min(args.epochs,args.warm_up)) * args.beta_max
+    model.train()
+    train_losses = torch.zeros(3)
+    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=args.decay, last_epoch=-1)
 
-    recon_y, mu_z, logvar_z, recons = model(data)
-    loss, ELL, KLD = loss_function(data,recon_y, mu_z, logvar_z, beta=beta)
+    for batch_idx, (data,_) in enumerate(train_loader):
+        data = mix_data(data.to(device))[0].view(-1,dimx)
 
-    test_losses[0] += loss.item()
-    test_losses[1] += ELL.item()
-    test_losses[2] += KLD.item()
-    break
+        optimizer.zero_grad()
+        recon_y, mu_z, logvar_z, _ = model(data)
+        loss, ELL, KLD = loss_function(data,recon_y, mu_z, logvar_z, beta=beta)
+        loss.backward()
+        optimizer.step()
+
+        train_losses[0] += loss.item()
+        train_losses[1] += ELL.item()
+        train_losses[2] += KLD.item()
+
+        if batch_idx % args.log_interval == 0:
+            print('Train Epoch: {} [{}/{} ({:.0f}%)] \t -ELL: {:5.6f} \t KLD: {:5.6f} \t Loss: {:5.6f}'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader),
+                ELL.item() / len(data),KLD.item() / len(data),loss.item() / len(data)))
+
+    train_losses /= len(train_loader.dataset)
+    print('====> Epoch: {} Average loss: {:.4f}'.format(
+            epoch, train_losses[0]))
+
+
+    if optimizer.param_groups[0]['lr'] >= 1.0e-5:
+        scheduler.step()
+
+    # with torch.no_grad():
+    #     if epoch % args.save_interval == 0:
+    #         torch.save(model.state_dict(),'saves/model_'+('vae' if args.variational else 'ae')+'_K' + str(args.sources) +  '.pt')
+
+
+
