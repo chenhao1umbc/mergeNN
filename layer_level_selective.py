@@ -121,7 +121,7 @@ class Container(nn.Module):
         xo = self.Decoder[2].block[1](xo)
         d = self.Decoder[2].block[2](xo)
         for i in range(3, len(self.Decoder)):
-            d = self.Encoder[i](d)    
+            d = self.Decoder[i](d)    
 
         recon_separate = torch.sigmoid(d).view(-1,self.n_sources,self.dimx)
         recon_x = recon_separate.sum(1) 
