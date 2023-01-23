@@ -201,5 +201,8 @@ for epoch in range(1, args.epochs+1):
     #     if epoch % args.save_interval == 0:
     #         torch.save(model.state_dict(),'saves/model_'+('vae' if args.variational else 'ae')+'_K' + str(args.sources) +  '.pt')
 
-
-
+plt.rcParams['figure.dpi'] = 150
+plt.imshow(torch.cat((reg[0], reg[1][:16]), dim=-1).T.cpu().detach())
+plt.colorbar(shrink=0.3)
+plt.xlabel('Sample index')
+plt.ylabel('Gate index')
